@@ -20,7 +20,14 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const contentType = response.headers.get('content-type');
-      
+      console.log('Login attempt for:', email);
+console.log('Request body structure:::::::', { em: '***', pass: '***', loy: false, rep: {} });
+console.log('Response status:', response.status);
+console.log('Response headers:', response.headers);
+console.log('Content-Type:', response.headers.get('content-type'));
+const responseText = await response.text();
+console.log('Response body (first 500 chars):', responseText.substring(0, 500));
+
       if (contentType && contentType.includes('application/json')) {
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
         return NextResponse.json(
@@ -31,6 +38,10 @@ export async function POST(request: Request) {
         // Bei nicht-JSON-Antworten den Text zurückgeben
         const text = await response.text();
         console.error("Nicht-JSON-Antwort:", text.substring(0, 500)); // Nur die ersten 500 Zeichen loggen
+        console.log('Request body structure:::::::', { em: '***', pass: '***', loy: false, rep: {} });
+console.log('Response status:', response.status);
+console.log('Response headers:', response.headers);
+console.log('Content-Type:', response.headers.get('content-type'));
         return NextResponse.json(
           { message: `Login fehlgeschlagen: Die API hat keine gültige JSON-Antwort gesendet` },
           { status: response.status }

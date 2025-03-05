@@ -112,6 +112,10 @@ class KickbaseAPI {
     }
   }
 
+  async getLeagueDetails(leagueId: string): Promise<any> {
+    return this.fetch(`/leagues/${leagueId}`);
+  }
+
   /**
    * Ligen des Benutzers abrufen
    */
