@@ -8,17 +8,34 @@ export async function POST(request: Request) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'Kickbase Analyzer',
+        'User-Agent': 'Kickbase/Android 5.7.1',
       },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ 
+        em: email, 
+        pass: password,
+        loy: false,
+        rep: {}
+      }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: response.statusText }));
-      return NextResponse.json(
-        { message: `Login fehlgeschlagen: ${errorData.message || response.statusText}` },
-        { status: response.status }
-      );
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+        return NextResponse.json(
+          { message: `Login fehlgeschlagen: ${errorData.message || response.statusText}` },
+          { status: response.status }
+        );
+      } else {
+        // Bei nicht-JSON-Antworten den Text zurückgeben
+        const text = await response.text();
+        console.error("Nicht-JSON-Antwort:", text.substring(0, 500)); // Nur die ersten 500 Zeichen loggen
+        return NextResponse.json(
+          { message: `Login fehlgeschlagen: Die API hat keine gültige JSON-Antwort gesendet` },
+          { status: response.status }
+        );
+      }
     }
 
     const data = await response.json();
