@@ -123,8 +123,56 @@ class KickbaseAPI {
     }
   }
 
+  /**
+   * Liga-Details abrufen
+   */
   async getLeagueDetails(leagueId: string): Promise<any> {
-    return this.fetch(`/leagues/${leagueId}`);
+    try {
+      if (!this.token) {
+        throw new Error('Nicht eingeloggt');
+      }
+      
+      console.log('Frontend: Liga-Details-Anfrage für ID', leagueId);
+      
+      const response = await fetch(`/api/leagues/${leagueId}/overview`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+        },
+      });
+  
+      // Status-Code protokollieren
+      console.log('Frontend: Liga-Details-Anfrage Status:', response.status);
+      
+      // Antwort als Text lesen
+      const responseText = await response.text();
+      console.log('Frontend: Liga-Details-Antwort Vorschau:', responseText.substring(0, 100));
+      
+      // Als JSON parsen
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (error) {
+        console.error('Frontend: Fehler beim Parsen der Liga-Details-Antwort:', error);
+        throw new Error('Fehler beim Abrufen der Liga-Details: Die Antwort konnte nicht als JSON verarbeitet werden');
+      }
+      
+      // Fehlerprüfung
+      if (!response.ok || data.message) {
+        const errorMessage = data.message || 'Fehler beim Abrufen der Liga-Details';
+        console.error('Frontend: Liga-Details-Anfrage fehlgeschlagen:', errorMessage);
+        throw new Error(errorMessage);
+      }
+      
+      // Datenstruktur protokollieren
+      console.log('Frontend: Liga-Details-Datenstruktur:', Object.keys(data));
+      
+      // Daten zurückgeben
+      return data;
+    } catch (error) {
+      console.error('Kickbase API Fehler:', error);
+      throw error;
+    }
   }
 
   /**
@@ -189,110 +237,57 @@ class KickbaseAPI {
     }
   }
 
-
   /**
- * Liga-Details abrufen
- */
-async getLeagueDetails(leagueId: string): Promise<any> {
-  try {
-    if (!this.token) {
-      throw new Error('Nicht eingeloggt');
-    }
-    
-    console.log('Frontend: Liga-Details-Anfrage für ID', leagueId);
-    
-    const response = await fetch(`/api/leagues/${leagueId}/overview`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${this.token}`,
-      },
-    });
-
-    // Status-Code protokollieren
-    console.log('Frontend: Liga-Details-Anfrage Status:', response.status);
-    
-    // Antwort als Text lesen
-    const responseText = await response.text();
-    console.log('Frontend: Liga-Details-Antwort Vorschau:', responseText.substring(0, 100));
-    
-    // Als JSON parsen
-    let data;
+   * Team des Benutzers in einer bestimmten Liga abrufen
+   */
+  async getTeam(leagueId: string): Promise<any> {
     try {
-      data = JSON.parse(responseText);
-    } catch (error) {
-      console.error('Frontend: Fehler beim Parsen der Liga-Details-Antwort:', error);
-      throw new Error('Fehler beim Abrufen der Liga-Details: Die Antwort konnte nicht als JSON verarbeitet werden');
-    }
-    
-    // Fehlerprüfung
-    if (!response.ok || data.message) {
-      const errorMessage = data.message || 'Fehler beim Abrufen der Liga-Details';
-      console.error('Frontend: Liga-Details-Anfrage fehlgeschlagen:', errorMessage);
-      throw new Error(errorMessage);
-    }
-    
-    // Datenstruktur protokollieren
-    console.log('Frontend: Liga-Details-Datenstruktur:', Object.keys(data));
-    
-    // Daten zurückgeben
-    return data;
-  } catch (error) {
-    console.error('Kickbase API Fehler:', error);
-    throw error;
-  }
-}
+      if (!this.token) {
+        throw new Error('Nicht eingeloggt');
+      }
+      
+      console.log('Frontend: Team-Anfrage für Liga', leagueId);
+      
+      const response = await fetch(`/api/leagues/${leagueId}/team`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+        },
+      });
 
-/**
- * Team des Benutzers in einer bestimmten Liga abrufen
- */
-async getTeam(leagueId: string): Promise<any> {
-  try {
-    if (!this.token) {
-      throw new Error('Nicht eingeloggt');
-    }
-    
-    console.log('Frontend: Team-Anfrage für Liga', leagueId);
-    
-    const response = await fetch(`/api/leagues/${leagueId}/team`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${this.token}`,
-      },
-    });
-
-    // Status-Code protokollieren
-    console.log('Frontend: Team-Anfrage Status:', response.status);
-    
-    // Antwort als Text lesen
-    const responseText = await response.text();
-    console.log('Frontend: Team-Antwort Vorschau:', responseText.substring(0, 100));
-    
-    // Als JSON parsen
-    let data;
-    try {
-      data = JSON.parse(responseText);
+      // Status-Code protokollieren
+      console.log('Frontend: Team-Anfrage Status:', response.status);
+      
+      // Antwort als Text lesen
+      const responseText = await response.text();
+      console.log('Frontend: Team-Antwort Vorschau:', responseText.substring(0, 100));
+      
+      // Als JSON parsen
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (error) {
+        console.error('Frontend: Fehler beim Parsen der Team-Antwort:', error);
+        throw new Error('Fehler beim Abrufen des Teams: Die Antwort konnte nicht als JSON verarbeitet werden');
+      }
+      
+      // Fehlerprüfung
+      if (!response.ok || data.message) {
+        const errorMessage = data.message || 'Fehler beim Abrufen des Teams';
+        console.error('Frontend: Team-Anfrage fehlgeschlagen:', errorMessage);
+        throw new Error(errorMessage);
+      }
+      
+      // Datenstruktur protokollieren
+      console.log('Frontend: Team-Datenstruktur:', Object.keys(data));
+      
+      // Daten zurückgeben
+      return data;
     } catch (error) {
-      console.error('Frontend: Fehler beim Parsen der Team-Antwort:', error);
-      throw new Error('Fehler beim Abrufen des Teams: Die Antwort konnte nicht als JSON verarbeitet werden');
+      console.error('Kickbase API Fehler:', error);
+      throw error;
     }
-    
-    // Fehlerprüfung
-    if (!response.ok || data.message) {
-      const errorMessage = data.message || 'Fehler beim Abrufen des Teams';
-      console.error('Frontend: Team-Anfrage fehlgeschlagen:', errorMessage);
-      throw new Error(errorMessage);
-    }
-    
-    // Datenstruktur protokollieren
-    console.log('Frontend: Team-Datenstruktur:', Object.keys(data));
-    
-    // Daten zurückgeben
-    return data;
-  } catch (error) {
-    console.error('Kickbase API Fehler:', error);
-    throw error;
   }
-}
 
   /**
    * Spieler des Teams abrufen
