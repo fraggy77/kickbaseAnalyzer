@@ -1,6 +1,6 @@
 // src/lib/kickbase-api.ts
 
-const BASE_URL = 'https://api.kickbase.de/v1';
+const BASE_URL = 'https://api.kickbase.de/v4';
 
 interface KickbaseUser {
   token: string;
@@ -26,33 +26,34 @@ class KickbaseAPI {
   /**
    * Bei Kickbase einloggen und Token speichern
    */
-  async login(email: string, password: string): Promise<KickbaseUser> {
-    try {
-      const response = await fetch(`${BASE_URL}/user/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Kickbase Analyzer',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+  // Ändere die Methode login
+async login(email: string, password: string): Promise<KickbaseUser> {
+  try {
+    // Wichtig: Hier verwenden wir UNSERE eigene API-Route, nicht direkt die Kickbase-API
+    const response = await fetch('/api/auth', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Login fehlgeschlagen: ${errorData.message || response.statusText}`);
-      }
-
-      const data = await response.json();
-      this.token = data.token;
-      this.userId = data.user.id;
-      this.email = email;
-      
-      return data;
-    } catch (error: any) {
-      console.error('Kickbase Login Fehler:', error);
-      throw error;
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Login fehlgeschlagen');
     }
+
+    const data = await response.json();
+    this.token = data.token;
+    this.userId = data.user?.id;
+    this.email = email;
+    
+    return data;
+  } catch (error: any) {
+    console.error('Kickbase Login Fehler:', error);
+    throw error;
   }
+}
 
   /**
    * Hilfsfunktion für authentifizierte API-Anfragen
@@ -101,14 +102,23 @@ class KickbaseAPI {
    * Ligen des Benutzers abrufen
    */
   async getLeagues(): Promise<League[]> {
-    return this.fetch('/leagues');
-  }
-
-  /**
-   * Detaillierte Informationen über eine Liga abrufen
-   */
-  async getLeagueDetails(leagueId: string): Promise<any> {
-    return this.fetch(`/leagues/${leagueId}`);
+    try {
+      const response = await fetch('/api/leagues', {
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+        },
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Fehler beim Abrufen der Ligen');
+      }
+  
+      return await response.json();
+    } catch (error) {
+      console.error('Kickbase API Fehler:', error);
+      throw error;
+    }
   }
 
   /**
