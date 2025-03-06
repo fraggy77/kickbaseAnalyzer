@@ -6,15 +6,27 @@ import { kickbaseAPI } from '@/lib/kickbase-api';
 
 interface Player {
   id: string;
-  firstName: string;
-  lastName: string;
-  teamId: string;
-  teamName: string;
-  position: number;
-  status: number;
-  marketValue: number;
-  points: number;
-  // Weitere Eigenschaften je nach API-Antwort
+  firstName?: string;
+  lastName?: string;
+  teamId?: string;
+  teamName?: string;
+  position?: number;
+  status?: number;
+  marketValue?: number;
+  points?: number;
+  // Kickbase API fields
+  i?: string;
+  n?: string;
+  fn?: string;
+  ln?: string;
+  pos?: number;
+  st?: number;
+  mv?: number;
+  p?: number;
+  ti?: string;
+  tn?: string;
+  // Weitere Eigenschaften
+  originalData?: any;
 }
 
 export default function TeamPage() {
@@ -72,16 +84,28 @@ export default function TeamPage() {
       
       // Spieler-Array extrahieren und setzen
       if (teamData && teamData.pl && Array.isArray(teamData.pl)) {
+        console.log(`${teamData.pl.length} Spieler geladen`);
+        if (teamData.pl.length > 0) {
+          console.log('Beispiel-Spieler:', teamData.pl[0]);
+        }
         setPlayers(teamData.pl);
         setTeamInfo({
-          budget: teamData.budget,
-          teamValue: teamData.teamValue,
-          name: teamData.tn || 'Mein Team',
+          budget: teamData.b || teamData.budget || 0,
+          teamValue: teamData.teamValue || teamData.tv || 0,
+          name: teamData.tn || teamData.lnm || 'Mein Team',
           points: teamData.tp || 0,
           rank: teamData.tr || 0
         });
       } else {
-        throw new Error('Unerwartetes Datenformat: Keine Spieler gefunden');
+        console.warn('Keine Spieler in den Team-Daten gefunden');
+        setPlayers([]);
+        setTeamInfo({
+          budget: teamData.b || teamData.budget || 0,
+          teamValue: teamData.teamValue || teamData.tv || 0,
+          name: teamData.tn || teamData.lnm || 'Mein Team',
+          points: teamData.tp || 0,
+          rank: teamData.tr || 0
+        });
       }
     } catch (error: any) {
       console.error('Fehler beim Laden der Team-Daten:', error);
@@ -113,6 +137,7 @@ export default function TeamPage() {
 
   const getStatusName = (status: number) => {
     switch (status) {
+      case 0: return 'Unbekannt';
       case 1: return 'Fit';
       case 2: return 'Verletzt';
       case 3: return 'Fraglich';
@@ -121,8 +146,23 @@ export default function TeamPage() {
   };
 
   // Formatiert Geldbeträge in Euro mit Tausenderpunkten
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: number = 0) => {
     return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
+  };
+
+  // Normalisiert Spielerdaten für einheitliche Darstellung
+  const normalizePlayer = (player: Player) => {
+    return {
+      id: player.id || player.i || '',
+      firstName: player.firstName || player.fn || '',
+      lastName: player.lastName || player.n || player.ln || '',
+      teamId: player.teamId || player.ti || '',
+      teamName: player.teamName || player.tn || '',
+      position: player.position || player.pos || 0,
+      status: player.status || player.st || 0,
+      marketValue: player.marketValue || player.mv || 0,
+      points: player.points || player.p || 0
+    };
   };
 
   return (
@@ -174,7 +214,7 @@ export default function TeamPage() {
                       {teamInfo.name}
                     </h2>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      Platz {teamInfo.rank} • {teamInfo.points} Punkte
+                      {teamInfo.rank ? `Platz ${teamInfo.rank} • ` : ''}{teamInfo.points || 0} Punkte
                     </p>
                   </div>
                   <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -228,42 +268,53 @@ export default function TeamPage() {
                       </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                      {players.map((player) => (
-                        <tr key={player.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div>
-                                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {player.firstName} {player.lastName}
+                      {players.length > 0 ? (
+                        players.map((player) => {
+                          const normalizedPlayer = normalizePlayer(player);
+                          return (
+                            <tr key={normalizedPlayer.id}>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                      {normalizedPlayer.firstName} {normalizedPlayer.lastName}
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{player.teamName}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{getPositionName(player.position)}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              player.status === 1 
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
-                                : player.status === 2 
-                                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' 
-                                : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                            }`}>
-                              {getStatusName(player.status)}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {formatCurrency(player.marketValue)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {player.points}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-500 dark:text-gray-400">{normalizedPlayer.teamName}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-500 dark:text-gray-400">{getPositionName(normalizedPlayer.position)}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                  normalizedPlayer.status === 1 
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                                    : normalizedPlayer.status === 2 
+                                    ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' 
+                                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                }`}>
+                                  {getStatusName(normalizedPlayer.status)}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                {formatCurrency(normalizedPlayer.marketValue)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                {normalizedPlayer.points}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                            Keine Spieler gefunden.
                           </td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>

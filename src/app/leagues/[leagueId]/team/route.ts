@@ -21,172 +21,140 @@ export async function GET(
     
     console.log(`Team-Anfrage für Liga ${leagueId} mit Token: ${token.substring(0, 15)}...`);
     
-    // Zuerst holen wir Nutzerinformationen, um unsere Team-ID zu bekommen
-    const meResponse = await fetch(`https://api.kickbase.com/v4/leagues/${leagueId}/me`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Kickbase/iOS 6.7.0',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    console.log('Me-Response Status:', meResponse.status);
-    const meResponseText = await meResponse.text();
-    console.log('Me-Response Vorschau:', meResponseText.substring(0, 200));
-    
-    if (!meResponse.ok) {
-      console.error(`Fehler beim Abrufen der Nutzerinformationen: ${meResponse.status}`);
+    // Verbesserte Error-Handling und Retries hinzufügen
+    async function safeApiRequest(url: string, options: RequestInit) {
+      const maxAttempts = 3;
+      let lastError = null;
       
-      // Bei ClientTooOld-Fehler Mock-Daten liefern
-      if (meResponseText.includes('ClientTooOld')) {
-        console.log('API meldet veralteten Client, liefere Mock-Daten');
-        return NextResponse.json({
-          tn: "Mein Team",
-          budget: 3500000,
-          teamValue: 120000000,
-          tp: 1245,
-          tr: 5,
-          pl: [
-            {
-              id: "player1",
-              firstName: "Robert",
-              lastName: "Lewandowski",
-              teamId: "fcb",
-              teamName: "FC Bayern München",
-              position: 4,
-              status: 1,
-              marketValue: 40000000,
-              points: 234
-            },
-            {
-              id: "player2",
-              firstName: "Marco",
-              lastName: "Reus",
-              teamId: "bvb",
-              teamName: "Borussia Dortmund",
-              position: 3,
-              status: 2,
-              marketValue: 25000000,
-              points: 187
-            },
-            {
-              id: "player3",
-              firstName: "Manuel",
-              lastName: "Neuer",
-              teamId: "fcb",
-              teamName: "FC Bayern München",
-              position: 1,
-              status: 1,
-              marketValue: 28000000,
-              points: 156
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          console.log(`API-Anfrage Versuch ${attempt} an ${url}`);
+          const response = await fetch(url, options);
+          
+          console.log(`Status-Code: ${response.status}`);
+          
+          // Zuerst die Antwort als Text lesen
+          const responseText = await response.text();
+          console.log(`Antwort-Länge: ${responseText.length}`);
+          console.log(`Antwort-Vorschau: ${responseText.substring(0, 150)}`);
+          
+          // Prüfen auf leere Antwort
+          if (!responseText || responseText.trim() === '') {
+            throw new Error('Leere Antwort vom Server');
+          }
+          
+          // Prüfen auf HTML
+          if (responseText.includes('<!DOCTYPE') || responseText.includes('<html')) {
+            throw new Error('HTML statt JSON erhalten');
+          }
+          
+          // Als JSON parsen
+          try {
+            const data = JSON.parse(responseText);
+            
+            // ClientTooOld-Fehler prüfen
+            if (data.err === 5 && data.errMsg === "ClientTooOld") {
+              console.error('API meldet veralteten Client');
+              return { 
+                error: 'ClientTooOld', 
+                status: 400, 
+                data: null 
+              };
             }
-          ]
-        });
+            
+            // OK Status oder andere Fehler
+            if (!response.ok) {
+              return {
+                error: data.message || data.errMsg || response.statusText || 'Unbekannter API-Fehler',
+                status: response.status,
+                data: null
+              };
+            }
+            
+            // Alles OK - Daten zurückgeben
+            return { error: null, status: 200, data };
+            
+          } catch (error) {
+            console.error(`JSON-Parse-Fehler bei Versuch ${attempt}:`, error);
+            throw new Error('Antwort konnte nicht als JSON verarbeitet werden');
+          }
+          
+        } catch (error: any) {
+          console.error(`Fehler bei Versuch ${attempt}:`, error.message);
+          lastError = error;
+          
+          // Nur warten, wenn wir einen weiteren Versuch machen werden
+          if (attempt < maxAttempts) {
+            const waitTime = Math.pow(2, attempt) * 300; // 600ms, 1.2s, 2.4s...
+            console.log(`Warte ${waitTime}ms vor dem nächsten Versuch...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
+        }
       }
       
-      return NextResponse.json(
-        { message: `Fehler beim Abrufen der Nutzerinformationen: ${meResponse.status}` },
-        { status: meResponse.status }
-      );
+      // Alle Versuche fehlgeschlagen
+      return {
+        error: lastError?.message || 'API-Anfrage fehlgeschlagen nach mehreren Versuchen',
+        status: 500,
+        data: null
+      };
     }
     
-    // Prüfen ob die Me-Response leer ist
-    if (!meResponseText.trim()) {
-      console.error('Leere Antwort von /me Endpoint');
-      return NextResponse.json(
-        { message: 'Fehler beim Abrufen der Nutzerinformationen: Leere Antwort' },
-        { status: 500 }
-      );
-    }
-    
-    let meData;
-    try {
-      meData = JSON.parse(meResponseText);
-      console.log('Me-Data Struktur:', Object.keys(meData));
-    } catch (error) {
-      console.error('Fehler beim Parsen der Me-Response:', error);
-      return NextResponse.json(
-        { message: 'Fehler beim Parsen der Nutzerinformationen' },
-        { status: 500 }
-      );
-    }
-    
-    const teamId = meData.id;
-    console.log('Team-ID extrahiert:', teamId);
-    
-    if (!teamId) {
-      console.error('Keine Team-ID in der Antwort gefunden');
-      return NextResponse.json(
-        { message: 'Fehler: Keine Team-ID in der Antwort gefunden' },
-        { status: 500 }
-      );
-    }
-    
-    // Jetzt holen wir die Spieler des Teams
-    const playersResponse = await fetch(`https://api.kickbase.com/v4/leagues/${leagueId}/teams/${teamId}/players`, {
+    // 1. Zuerst holen wir die ME-Daten für Liga-Info
+    const meResult = await safeApiRequest(`https://api.kickbase.com/v4/leagues/${leagueId}/me`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'Kickbase/iOS 6.7.0',
+        'User-Agent': 'Kickbase/iOS 6.9.0',
         'Accept': 'application/json',
         'Authorization': `Bearer ${token}`
       }
     });
-
-    console.log('Spieler-API response status:', playersResponse.status);
     
-    // Antwort als Text lesen für sichereres Verarbeiten
-    const playersResponseText = await playersResponse.text();
-    console.log('Spieler-Antwort-Vorschau:', playersResponseText.substring(0, 200));
-    
-    // Falls wir keine oder eine leere Antwort bekommen
-    if (!playersResponseText.trim()) {
-      console.error('Leere Antwort vom /players Endpoint');
-      
-      // Kombiniere die bereits abgerufenen Me-Daten mit leerer Spielerliste
-      return NextResponse.json({
-        ...meData,
-        pl: []
-      });
-    }
-    
-    // Als JSON parsen
-    let playersData;
-    try {
-      playersData = JSON.parse(playersResponseText);
-      console.log('Spieler-Datenstruktur:', 
-        playersData ? Object.keys(playersData) : 'Keine Daten'
+    if (meResult.error) {
+      console.error(`Fehler beim Abrufen der ME-Daten: ${meResult.error}`);
+      return NextResponse.json(
+        { message: `Fehler beim Abrufen der Teamdaten: ${meResult.error}` },
+        { status: meResult.status || 500 }
       );
-      
-      // Auf "ClientTooOld"-Fehler prüfen
-      if (playersData.err === 5 && playersData.errMsg === "ClientTooOld") {
-        console.error('API meldet veralteten Client');
-        return NextResponse.json(
-          { message: 'Fehler beim Abrufen der Spieler: Die API meldet, dass der Client zu alt ist' },
-          { status: 400 }
-        );
+    }
+    
+    const meData = meResult.data;
+    console.log('ME-Daten erhalten:', Object.keys(meData));
+    
+    // 2. Jetzt holen wir die Squad-Daten mit dem korrekten Endpunkt
+    const squadResult = await safeApiRequest(`https://api.kickbase.com/v4/leagues/${leagueId}/squad`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Kickbase/iOS 6.9.0',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
       }
-      
-      // Hier kombinieren wir die Me-Daten mit den Spielerdaten 
-      const combinedData = {
-        ...meData,
-        pl: playersData.pl || []
-      };
-      
-      // Die kombinierten Daten zurückgeben
-      return NextResponse.json(combinedData);
-      
-    } catch (error) {
-      console.error('Fehler beim Parsen der Spieler-Antwort als JSON:', error);
-      
-      // Wir geben die Me-Daten ohne Spieler zurück
+    });
+    
+    if (squadResult.error) {
+      console.error(`Fehler beim Abrufen der Squad-Daten: ${squadResult.error}`);
+      // Wir liefern trotzdem die ME-Daten mit leerer Spielerliste
       return NextResponse.json({
         ...meData,
         pl: []
       });
     }
+    
+    const squadData = squadResult.data;
+    console.log('Squad-Daten erhalten:', squadData ? `${squadData.pl?.length || 0} Spieler gefunden` : 'Keine Spieler');
+    
+    // Kombiniere ME-Daten mit Squad-Daten
+    const combinedData = {
+      ...meData,
+      budget: meData.b || 0,
+      teamValue: meData.tv || 0,
+      pl: squadData.pl || []
+    };
+    
+    return NextResponse.json(combinedData);
+    
   } catch (error: any) {
     console.error('Team fetch error:', error);
     return NextResponse.json(
