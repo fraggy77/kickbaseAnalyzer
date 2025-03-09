@@ -237,6 +237,316 @@ class KickbaseAPI {
     }
   }
 
+
+  /**
+ * Alle Spiele abrufen
+ */
+async getAllMatches(): Promise<any> {
+  try {
+    if (!this.token) {
+      throw new Error('Nicht eingeloggt');
+    }
+    
+    console.log('Frontend: Anfrage für alle Matches');
+    
+    const response = await fetch(`/api/matches`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+      },
+    });
+
+    // Status-Code protokollieren
+    console.log('Frontend: Alle Matches Anfrage Status:', response.status);
+    
+    // Antwort als Text lesen
+    const responseText = await response.text();
+    console.log('Frontend: Alle Matches Antwort Vorschau:', responseText.substring(0, 100));
+    
+    // Als JSON parsen
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (error) {
+      console.error('Frontend: Fehler beim Parsen der Alle-Matches-Antwort:', error);
+      throw new Error('Fehler beim Abrufen aller Matches: Die Antwort konnte nicht als JSON verarbeitet werden');
+    }
+    
+    // Fehlerprüfung
+    if (!response.ok || data.message) {
+      const errorMessage = data.message || 'Fehler beim Abrufen aller Matches';
+      console.error('Frontend: Alle Matches Anfrage fehlgeschlagen:', errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    // Datenstruktur protokollieren
+    console.log('Frontend: Alle Matches Datenstruktur:', Object.keys(data));
+    
+    return data;
+  } catch (error) {
+    console.error('Kickbase API Fehler:', error);
+    throw error;
+  }
+}
+
+/**
+ * Debug-Methode: Testet verschiedene Endpoints, um Match-IDs zu finden
+ */
+async debugEndpoints(): Promise<any> {
+  try {
+    if (!this.token) {
+      throw new Error('Nicht eingeloggt');
+    }
+    
+    console.log('Frontend: Debug-Anfrage für Endpoints');
+    
+    const response = await fetch('/api/matches/debug', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+      },
+    });
+
+    // Status-Code protokollieren
+    console.log('Frontend: Debug-Anfrage Status:', response.status);
+    
+    // Antwort als Text lesen
+    const responseText = await response.text();
+    console.log('Frontend: Debug-Antwort Länge:', responseText.length);
+    
+    // Als JSON parsen
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (error) {
+      console.error('Frontend: Fehler beim Parsen der Debug-Antwort:', error);
+      throw new Error('Fehler bei der Debug-Anfrage: Die Antwort konnte nicht als JSON verarbeitet werden');
+    }
+    
+    // Fehlerprüfung
+    if (!response.ok || data.message && data.message.includes('Fehler')) {
+      const errorMessage = data.message || 'Fehler bei der Debug-Anfrage';
+      console.error('Frontend: Debug-Anfrage fehlgeschlagen:', errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    // Erfolg
+    console.log('Frontend: Debug-Daten erfolgreich geladen');
+    
+    return data;
+  } catch (error) {
+    console.error('Kickbase API Debug Fehler:', error);
+    throw error;
+  }
+}
+
+/**
+ * Debug-Methode: Testet wettbewerbsspezifische Endpoints
+ */
+async debugCompetition(): Promise<any> {
+  try {
+    if (!this.token) {
+      throw new Error('Nicht eingeloggt');
+    }
+    
+    console.log('Frontend: Competition-Debug-Anfrage');
+    
+    const response = await fetch('/api/matches/competition', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+      },
+    });
+
+    // Status-Code protokollieren
+    console.log('Frontend: Competition-Debug-Anfrage Status:', response.status);
+    
+    // Antwort als Text lesen
+    const responseText = await response.text();
+    console.log('Frontend: Competition-Debug-Antwort Länge:', responseText.length);
+    
+    // Als JSON parsen
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (error) {
+      console.error('Frontend: Fehler beim Parsen der Competition-Debug-Antwort:', error);
+      throw new Error('Fehler bei der Competition-Debug-Anfrage: Die Antwort konnte nicht als JSON verarbeitet werden');
+    }
+    
+    // Fehlerprüfung
+    if (!response.ok || data.message && data.message.includes('Fehler')) {
+      const errorMessage = data.message || 'Fehler bei der Competition-Debug-Anfrage';
+      console.error('Frontend: Competition-Debug-Anfrage fehlgeschlagen:', errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    // Erfolg
+    console.log('Frontend: Competition-Debug-Daten erfolgreich geladen');
+    
+    return data;
+  } catch (error) {
+    console.error('Kickbase API Competition Debug Fehler:', error);
+    throw error;
+  }
+}
+
+/**
+ * Spieltags-Daten mit Match-IDs abrufen
+ */
+async getMatchday(day?: number): Promise<any> {
+  try {
+    if (!this.token) {
+      throw new Error('Nicht eingeloggt');
+    }
+    
+    console.log('Frontend: Spieltags-Anfrage' + (day ? ` für Tag ${day}` : ''));
+    
+    // Spieltag als Query-Parameter anhängen, falls vorhanden
+    const url = day ? `/api/matches/matchday?day=${day}` : '/api/matches/matchday';
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+      },
+    });
+
+    // Status-Code protokollieren
+    console.log('Frontend: Spieltags-Anfrage Status:', response.status);
+    
+    // Antwort als Text lesen
+    const responseText = await response.text();
+    console.log('Frontend: Spieltags-Antwort Länge:', responseText.length);
+    
+    // Als JSON parsen
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (error) {
+      console.error('Frontend: Fehler beim Parsen der Spieltags-Antwort:', error);
+      throw new Error('Fehler bei der Spieltags-Anfrage: Die Antwort konnte nicht als JSON verarbeitet werden');
+    }
+    
+    // Fehlerprüfung
+    if (!response.ok || data.message && data.message.includes('Fehler')) {
+      const errorMessage = data.message || 'Fehler bei der Spieltags-Anfrage';
+      console.error('Frontend: Spieltags-Anfrage fehlgeschlagen:', errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    // Erfolg
+    console.log('Frontend: Spieltags-Daten erfolgreich geladen');
+    console.log(`Frontend: ${data.matchIds?.length || 0} Match-IDs gefunden`);
+    
+    return data;
+  } catch (error) {
+    console.error('Kickbase API Spieltags-Anfrage Fehler:', error);
+    throw error;
+  }
+}
+  /**
+ * Spiele einer Liga abrufen
+ */
+async getMatches(leagueId: string): Promise<any> {
+  try {
+    if (!this.token) {
+      throw new Error('Nicht eingeloggt');
+    }
+    
+    console.log('Frontend: Matches-Anfrage für Liga', leagueId);
+    
+    const response = await fetch(`/api/leagues/${leagueId}/matches`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+      },
+    });
+
+    // Status-Code protokollieren
+    console.log('Frontend: Matches-Anfrage Status:', response.status);
+    
+    // Antwort als Text lesen
+    const responseText = await response.text();
+    console.log('Frontend: Matches-Antwort Vorschau:', responseText.substring(0, 100));
+    
+    // Als JSON parsen
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (error) {
+      console.error('Frontend: Fehler beim Parsen der Matches-Antwort:', error);
+      throw new Error('Fehler beim Abrufen der Matches: Die Antwort konnte nicht als JSON verarbeitet werden');
+    }
+    
+    // Fehlerprüfung
+    if (!response.ok || data.message) {
+      const errorMessage = data.message || 'Fehler beim Abrufen der Matches';
+      console.error('Frontend: Matches-Anfrage fehlgeschlagen:', errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    // Datenstruktur protokollieren
+    console.log('Frontend: Matches-Datenstruktur:', Object.keys(data));
+    
+    return data;
+  } catch (error) {
+    console.error('Kickbase API Fehler:', error);
+    throw error;
+  }
+}
+
+  /**
+ * Wettlink für ein bestimmtes Spiel abrufen
+ */
+async getBetlink(matchId: string): Promise<any> {
+  try {
+    if (!this.token) {
+      throw new Error('Nicht eingeloggt');
+    }
+    
+    console.log('Frontend: Betlink-Anfrage für Match', matchId);
+    
+    const response = await fetch(`/api/matches/${matchId}/betlink`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+      },
+    });
+
+    // Status-Code protokollieren
+    console.log('Frontend: Betlink-Anfrage Status:', response.status);
+    
+    // Antwort als Text lesen
+    const responseText = await response.text();
+    console.log('Frontend: Betlink-Antwort Vorschau:', responseText.substring(0, 100));
+    
+    // Als JSON parsen
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (error) {
+      console.error('Frontend: Fehler beim Parsen der Betlink-Antwort:', error);
+      throw new Error('Fehler beim Abrufen des Betlinks: Die Antwort konnte nicht als JSON verarbeitet werden');
+    }
+    
+    // Fehlerprüfung
+    if (!response.ok || data.message) {
+      const errorMessage = data.message || 'Fehler beim Abrufen des Betlinks';
+      console.error('Frontend: Betlink-Anfrage fehlgeschlagen:', errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    // Datenstruktur protokollieren
+    console.log('Frontend: Betlink-Datenstruktur:', Object.keys(data));
+    
+    return data;
+  } catch (error) {
+    console.error('Kickbase API Fehler:', error);
+    throw error;
+  }
+}
+
   /**
    * Team des Benutzers in einer bestimmten Liga abrufen
    */

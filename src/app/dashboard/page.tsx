@@ -112,6 +112,7 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        
         <div className="px-4 py-6 sm:px-0">
           {isLoading ? (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex justify-center">
@@ -164,7 +165,51 @@ export default function DashboardPage() {
                     
                     {/* Hier könnten weitere Liga-Details angezeigt werden */}
                     <div className="pt-5">
-                      <div className="flex justify-between">
+                    <div className="flex justify-between">
+    <button
+      type="button"
+      onClick={() => router.push(`/team?league=${leagueId}`)}
+      className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+    >
+      Mein Team anzeigen
+    </button>
+    
+    <div className="space-x-2">
+      <button
+        type="button"
+        className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+      >
+        Tabelle anzeigen
+      </button>
+      
+      <button
+        type="button"
+        onClick={() => router.push(`/betting?league=${leagueId}`)}
+        className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+      >
+        Wettquoten
+      </button>
+    </div>
+  </div>
+  <div className="mt-4">
+  <button
+    type="button"
+    onClick={() => router.push(`/test-matches`)}
+    className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+  >
+    Test: Alle Spiele
+  </button>
+</div>
+<div className="mt-4 flex flex-wrap gap-2">
+<button
+  type="button"
+  onClick={() => router.push(`/matchday`)}
+  className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+>
+  Spieltage & Wettquoten
+</button>
+</div>
+                      {/* <div className="flex justify-between">
                         <button
                           type="button"
                           onClick={() => router.push(`/team?league=${leagueId}`)}
@@ -179,7 +224,7 @@ export default function DashboardPage() {
                         >
                           Tabelle anzeigen
                         </button>
-                      </div>
+                      </div> */}
                     </div>
                   </div>
                 )}
