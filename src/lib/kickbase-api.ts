@@ -243,83 +243,6 @@ class KickbaseAPI {
 /**
  * Team des Benutzers in einer bestimmten Liga abrufen
  */
-async getTeam(leagueId: string): Promise<any> {
-  try {
-    if (!this.token) {
-      throw new Error('Nicht eingeloggt');
-    }
-    
-    console.log('Frontend: Team-Anfrage für Liga', leagueId);
-    
-    const response = await fetch(`/api/leagues/${leagueId}/team`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${this.token}`,
-      },
-    });
-
-    // Status-Code protokollieren
-    console.log('Frontend: Team-Anfrage Status:', response.status);
-    
-    // Antwort als Text lesen
-    const responseText = await response.text();
-    console.log('Frontend: Team-Antwort Vorschau:', responseText.substring(0, 100));
-    
-    // Als JSON parsen
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (error) {
-      console.error('Frontend: Fehler beim Parsen der Team-Antwort:', error);
-      throw new Error('Fehler beim Abrufen des Teams: Die Antwort konnte nicht als JSON verarbeitet werden');
-    }
-    
-    // Fehlerprüfung
-    if (!response.ok || data.message) {
-      const errorMessage = data.message || 'Fehler beim Abrufen des Teams';
-      console.error('Frontend: Team-Anfrage fehlgeschlagen:', errorMessage);
-      throw new Error(errorMessage);
-    }
-    
-    // Datenstruktur protokollieren
-    console.log('Frontend: Team-Datenstruktur:', Object.keys(data));
-    
-    // Daten normalisieren - sicherstellen, dass ein konsistentes Datenformat zurückgegeben wird
-    const normalizedData = {
-      // Team-ID könnte in verschiedenen Feldern sein
-      id: data.id || data.un || data.cpi || 'unknown',
-      // Team-Name oder Default
-      tn: data.tn || data.lnm || 'Mein Team',
-      // Budget mit Fallback auf 0
-      budget: data.b || data.budget || 0,
-      // Teamwert mit Fallback auf 0
-      teamValue: data.teamValue || 0,
-      // Spielerliste mit Fallback auf leeres Array
-      pl: data.pl || [],
-      // Andere Daten
-      tp: data.tp || 0, // Punkte
-      tr: data.tr || 0, // Rang
-      // Original-Daten für den Fall, dass wir sie später brauchen
-      originalData: data
-    };
-    
-    console.log('Frontend: Normalisierte Team-Daten:', {
-      id: normalizedData.id,
-      tn: normalizedData.tn,
-      spielerAnzahl: normalizedData.pl.length
-    });
-    
-    // Normalisierte Daten zurückgeben
-    return normalizedData;
-  } catch (error) {
-    console.error('Kickbase API Fehler:', error);
-    throw error;
-  }
-}
-
-/**
- * Squad (Kader) des Benutzers in einer bestimmten Liga abrufen
- */
 async getSquad(leagueId: string): Promise<any> {
   try {
     if (!this.token) {
@@ -328,6 +251,7 @@ async getSquad(leagueId: string): Promise<any> {
     
     console.log('Frontend: Squad-Anfrage für Liga', leagueId);
     
+    // Korrekter Endpunkt für Squad-Daten
     const response = await fetch(`/api/leagues/${leagueId}/squad`, {
       method: 'GET',
       headers: {
@@ -361,13 +285,64 @@ async getSquad(leagueId: string): Promise<any> {
     // Datenstruktur protokollieren
     console.log('Frontend: Squad-Datenstruktur:', Object.keys(data));
     
-    // Prüfen, ob die Spielerliste existiert
-    if (!data.pl || !Array.isArray(data.pl)) {
-      console.warn('Frontend: Keine Spieler im Squad gefunden oder ungültiges Format');
-      data.pl = []; // Leeres Array setzen, damit die Anwendung nicht abstürzt
-    } else {
-      console.log(`Frontend: ${data.pl.length} Spieler im Squad gefunden`);
+    return data;
+  } catch (error) {
+    console.error('Kickbase API Fehler:', error);
+    throw error;
+  }
+}
+
+/**
+ * Die getTeam Methode anpassen, um den Squad-Endpunkt zu nutzen, wenn das nicht schon gemacht wurde
+ */
+async getTeam(leagueId: string): Promise<any> {
+  // Wir könnten hier entweder den getSquad-Aufruf verwenden
+  // return this.getSquad(leagueId);
+  
+  // Oder wir behalten die vorhandene Implementierung bei, aber ändern den Pfad
+  try {
+    if (!this.token) {
+      throw new Error('Nicht eingeloggt');
     }
+    
+    console.log('Frontend: Team-Anfrage für Liga', leagueId);
+    
+    // Hier sollte der Endpunkt korrigiert werden
+    const response = await fetch(`/api/leagues/${leagueId}/squad`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+      },
+    });
+
+    // Rest der Methode bleibt gleich...
+    // ...
+
+    // Status-Code protokollieren
+    console.log('Frontend: Team-Anfrage Status:', response.status);
+    
+    // Antwort als Text lesen
+    const responseText = await response.text();
+    console.log('Frontend: Team-Antwort Vorschau:', responseText.substring(0, 100));
+    
+    // Als JSON parsen
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (error) {
+      console.error('Frontend: Fehler beim Parsen der Team-Antwort:', error);
+      throw new Error('Fehler beim Abrufen des Teams: Die Antwort konnte nicht als JSON verarbeitet werden');
+    }
+    
+    // Fehlerprüfung
+    if (!response.ok || data.message) {
+      const errorMessage = data.message || 'Fehler beim Abrufen des Teams';
+      console.error('Frontend: Team-Anfrage fehlgeschlagen:', errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    // Datenstruktur protokollieren
+    console.log('Frontend: Team-Datenstruktur:', Object.keys(data));
     
     return data;
   } catch (error) {

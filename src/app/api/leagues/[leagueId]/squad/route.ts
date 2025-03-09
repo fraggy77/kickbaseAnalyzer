@@ -1,3 +1,5 @@
+// src/app/api/leagues/[leagueId]/squad/route.ts
+
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
 
@@ -100,7 +102,29 @@ export async function GET(
       };
     }
     
-    // Spieler-Squad abrufen
+    // 1. ME-Daten für Basis-Informationen abrufen
+    const meResult = await safeApiRequest(`https://api.kickbase.com/v4/leagues/${leagueId}/me`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Kickbase/iOS 6.9.0',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (meResult.error) {
+      console.error(`Fehler beim Abrufen der ME-Daten: ${meResult.error}`);
+      return NextResponse.json(
+        { message: `Fehler beim Abrufen der Teamdaten: ${meResult.error}` },
+        { status: meResult.status || 500 }
+      );
+    }
+    
+    const meData = meResult.data;
+    console.log('ME-Daten erhalten:', Object.keys(meData));
+    
+    // 2. Spielerdaten vom korrekten Kickbase-Endpunkt abrufen
     const squadResult = await safeApiRequest(`https://api.kickbase.com/v4/leagues/${leagueId}/squad`, {
       method: 'GET',
       headers: {
@@ -110,45 +134,56 @@ export async function GET(
         'Authorization': `Bearer ${token}`
       }
     });
-
-    // Fehlerbehandlung für die Squad-Anfrage
+    
     if (squadResult.error) {
-      console.error(`Fehler beim Abrufen des Squads: ${squadResult.error}`);
-      
-      if (squadResult.error === 'ClientTooOld') {
-        return NextResponse.json(
-          { message: 'Fehler beim Abrufen des Squads: Die API meldet, dass der Client zu alt ist' },
-          { status: 400 }
-        );
-      }
-      
-      return NextResponse.json(
-        { message: `Fehler beim Abrufen des Squads: ${squadResult.error}` },
-        { status: squadResult.status }
-      );
-    }
-    
-    const squadData = squadResult.data;
-    
-    // Prüfen, ob die erwarteten Daten vorhanden sind
-    if (!squadData || !Array.isArray(squadData.pl)) {
-      console.error('Unerwartetes Datenformat: Keine Spieler gefunden');
-      
-      // Leeres Array zurückgeben, damit die Frontend-Anwendung nicht abstürzt
+      console.error(`Fehler beim Abrufen der Squad-Daten: ${squadResult.error}`);
+      // Wir liefern trotzdem die ME-Daten mit leerer Spielerliste
       return NextResponse.json({
+        ...meData,
+        budget: meData.b || 0,
+        teamValue: meData.tv || 0,
         pl: []
       });
     }
     
-    // Log des Datenformats für Debugging
-    console.log(`Squad Spieleranzahl: ${squadData.pl.length}`);
-    if (squadData.pl.length > 0) {
-      console.log('Beispiel-Spieler-Felder:', Object.keys(squadData.pl[0]));
+    const squadData = squadResult.data;
+    
+    // Überprüfe die Struktur der Squad-Daten
+    console.log('Squad-Daten Struktur:', Object.keys(squadData));
+    
+    // Die Spieler sind in squadData.it (items)
+    const players = squadData.it || [];
+    console.log(`Squad enthält ${players.length} Spieler`);
+    
+    if (players.length > 0) {
+      console.log('Felder des ersten Spielers:', Object.keys(players[0]));
     }
     
-    // Die Daten zurückgeben
-    return NextResponse.json(squadData);
-      
+    // Transformiere die Spielerdaten ins erwartete Format
+    const transformedPlayers = players.map(player => ({
+      id: player.i || '',
+      firstName: player.fn || '', // Falls verfügbar
+      lastName: player.n || player.ln || '',
+      position: player.pos || 0,
+      status: player.st || 0,
+      marketValue: player.mv || 0,
+      points: player.p || 0,
+      teamId: player.ti || '',
+      teamName: player.tn || '',
+      // Originalfelder für Debugging beibehalten
+      originalData: player
+    }));
+    
+    // Kombiniere ME-Daten mit transformierten Squad-Daten
+    const combinedData = {
+      ...meData,
+      budget: meData.b || 0,
+      teamValue: meData.tv || 0,
+      pl: transformedPlayers
+    };
+    
+    return NextResponse.json(combinedData);
+    
   } catch (error: any) {
     console.error('Squad fetch error:', error);
     return NextResponse.json(
