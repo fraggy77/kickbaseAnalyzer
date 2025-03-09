@@ -119,6 +119,7 @@ export async function GET(request: NextRequest) {
           
           if (allMatchdays.it[0].it.length > 0) {
             console.log(`Erstes Spiel Keys:`, Object.keys(allMatchdays.it[0].it[0]));
+            console.log(`Beispiel Spiel:`, JSON.stringify(allMatchdays.it[0].it[0]));
           }
         }
       }
@@ -153,14 +154,19 @@ export async function GET(request: NextRequest) {
       // Durchlaufe alle Spiele dieses Spieltags
       matches = matchdayData.it.map(match => {
         // Extrahiere die relevanten Informationen für jedes Spiel
+        // Verwende die richtigen Schlüssel basierend auf dem Debug-Output
         return {
-          id: match.i || match.id || '',
-          homeTeam: match.ht || match.homeTeam || 'Unbekannt',
-          awayTeam: match.at || match.awayTeam || 'Unbekannt',
-          date: match.kdt || match.kickoffDate || match.dt || 'Kein Datum',
-          homeScore: match.hg || match.homeGoals,
-          awayScore: match.ag || match.awayGoals,
-          status: match.st || match.status || 0,
+          id: match.mi || '', // 'mi' ist der Schlüssel für Match-ID
+          homeTeam: match.t1 || 'Unbekannt', // 't1' für Team 1
+          awayTeam: match.t2 || 'Unbekannt', // 't2' für Team 2
+          date: match.dt || 'Kein Datum', // 'dt' für Datum
+          homeScore: match.t1g, // 't1g' für Team 1 Goals
+          awayScore: match.t2g, // 't2g' für Team 2 Goals
+          status: match.st || 0, // 'st' für Status
+          // Additional info
+          homeTeamImage: match.t1im,
+          awayTeamImage: match.t2im,
+          matchDay: match.day,
           // Original-Daten für Debugging
           raw: match
         };

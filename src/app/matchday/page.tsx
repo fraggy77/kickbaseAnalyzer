@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { kickbaseAPI } from '@/lib/kickbase-api';
+import { getTeamName } from './teamMapping';
 
 export default function MatchdayPage() {
   const router = useRouter();
   const [matchdayData, setMatchdayData] = useState<any>(null);
-  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
-  const [betlinkData, setBetlinkData] = useState<any>(null);
+  const [betlinkData, setBetlinkData] = useState<{[key: string]: any}>({});
+  const [loadingBetlinks, setLoadingBetlinks] = useState<{[key: string]: boolean}>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [currentDay, setCurrentDay] = useState(25); // Standard-Spieltag
@@ -45,14 +46,40 @@ export default function MatchdayPage() {
   const loadMatchday = async (day: number) => {
     try {
       setIsLoading(true);
-      setSelectedMatchId(null);
-      setBetlinkData(null);
+      setBetlinkData({});
       
       // Spieltags-Daten abrufen
       const data = await kickbaseAPI.getMatchday(day);
       console.log('Spieltags-Daten geladen:', data);
       
-      setMatchdayData(data);
+      if (data && data.matches && data.matches.length > 0) {
+        console.log(`Frontend: ${data.matches.length} Spiele gefunden`);
+        
+        // Team-Mapping anwenden, falls nötig
+        if (data.matches[0].homeTeam && !isNaN(Number(data.matches[0].homeTeam))) {
+          // Wenn homeTeam eine Zahl ist, ist es eine ID und wir sollten sie mappen
+          data.matches = data.matches.map((match: any) => ({
+            ...match,
+            // Speichere die Original-IDs
+            homeTeamId: match.homeTeam,
+            awayTeamId: match.awayTeam,
+            // Ersetze durch lesbare Namen
+            homeTeam: match.homeTeam ? (match.homeTeamSymbol || getTeamName(match.homeTeam)) : 'Unbekannt',
+            awayTeam: match.awayTeam ? (match.awayTeamSymbol || getTeamName(match.awayTeam)) : 'Unbekannt'
+          }));
+        }
+        
+        setMatchdayData(data);
+        setIsLoading(false);
+        
+        // Wettquoten für alle Spiele direkt laden
+        await loadAllBetlinks(data.matches);
+      } else {
+        console.log('Frontend: Keine Spiele gefunden oder leere Daten');
+        setMatchdayData(data);
+        setIsLoading(false);
+      }
+      
     } catch (error: any) {
       console.error('Fehler beim Laden der Spieltags-Daten:', error);
       setError('Die Spieltags-Daten konnten nicht geladen werden. ' + error.message);
@@ -62,27 +89,56 @@ export default function MatchdayPage() {
         localStorage.removeItem('kickbaseUser');
         router.push('/');
       }
-    } finally {
       setIsLoading(false);
     }
   };
 
-  const handleBetlinkTest = async (matchId: string) => {
+  // Lädt die Betlinks für alle Matches auf einmal
+  const loadAllBetlinks = async (matches: any[]) => {
+    if (!matches || matches.length === 0) return;
+    
+    console.log('Lade Wettquoten für alle Spiele...');
+    
+    // Erstelle ein Objekt, um den Ladestatus aller Matches zu verfolgen
+    const initialLoadingState: {[key: string]: boolean} = {};
+    matches.forEach(match => {
+      initialLoadingState[match.id] = true;
+    });
+    setLoadingBetlinks(initialLoadingState);
+    
+    // Parallel alle Betlinks laden
+    const betlinkPromises = matches.map(match => 
+      loadBetlinkForMatch(match.id)
+        .finally(() => {
+          // Ladestatus für dieses Match aktualisieren
+          setLoadingBetlinks(prev => ({
+            ...prev,
+            [match.id]: false
+          }));
+        })
+    );
+    
+    // Warten bis alle geladen sind
+    await Promise.allSettled(betlinkPromises);
+    console.log('Alle Wettquoten geladen!');
+  };
+
+  // Lädt Betlink-Daten für ein einzelnes Match
+  const loadBetlinkForMatch = async (matchId: string) => {
     try {
-      setIsLoading(true);
-      setSelectedMatchId(matchId);
-      
-      // Betlink abrufen
+      console.log(`Lade Wettquoten für Match ${matchId}...`);
       const data = await kickbaseAPI.getBetlink(matchId);
-      console.log('Betlink-Daten geladen:', data);
       
-      setBetlinkData(data);
+      // Füge die Daten zur betlinkData-Map hinzu
+      setBetlinkData(prev => ({
+        ...prev,
+        [matchId]: data
+      }));
+      
+      return data;
     } catch (error: any) {
-      console.error('Fehler beim Laden des Betlinks:', error);
-      setError('Der Betlink konnte nicht geladen werden. ' + error.message);
-      setBetlinkData(null);
-    } finally {
-      setIsLoading(false);
+      console.error(`Fehler beim Laden der Wettquoten für Match ${matchId}:`, error);
+      return null;
     }
   };
 
@@ -116,6 +172,39 @@ export default function MatchdayPage() {
     } catch (e) {
       return dateStr;
     }
+  };
+
+  // Status formatieren
+  const getStatusText = (status: number): string => {
+    switch (status) {
+      case 0: return "Anstehend";
+      case 1: return "Läuft";
+      case 2: return "Beendet";
+      case 3: return "Abgesagt";
+      default: return "Unbekannt";
+    }
+  };
+
+  // Teambilder verwenden
+  const renderTeamImage = (imageUrl: string) => {
+    if (!imageUrl) return null;
+    
+    // Wenn der Pfad relativ ist, fügen wir den API-Basispfad hinzu
+    const fullUrl = imageUrl.startsWith('http') 
+      ? imageUrl 
+      : `https://kickbase.b-cdn.net/${imageUrl}`;
+    
+    return (
+      <img 
+        src={fullUrl} 
+        alt="Team Logo" 
+        className="w-6 h-6 mr-2"
+        onError={(e) => {
+          // Bei Fehler ein Fallback-Icon anzeigen
+          e.currentTarget.style.display = 'none';
+        }}
+      />
+    );
   };
 
   return (
@@ -179,47 +268,94 @@ export default function MatchdayPage() {
           ) : (
             <>
               {/* Match-Übersicht */}
-              {matchdayData && matchdayData.matchIds && matchdayData.matchIds.length > 0 ? (
+              {matchdayData && matchdayData.matches && matchdayData.matches.length > 0 ? (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
                   <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
                     <h2 className="text-lg font-medium text-gray-900 dark:text-white">Spiele</h2>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      {matchdayData.matchIds.length} Spiele gefunden - Klicke auf ein Spiel, um Wettquoten anzuzeigen
+                      {matchdayData.matches.length} Spiele gefunden - Inklusive Wettquoten
                     </p>
                   </div>
                   <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {matchdayData.matchIds.map((match, index) => (
-                      <div 
-                        key={`match-${index}`}
-                        className={`px-6 py-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 ${
-                          selectedMatchId === match.id ? 'bg-gray-100 dark:bg-gray-700' : ''
-                        }`}
-                        onClick={() => handleBetlinkTest(match.id)}
-                      >
-                        <div className="flex flex-col sm:flex-row justify-between">
-                          <div className="flex-1">
-                            <div className="font-medium">{match.homeTeam} - {match.awayTeam}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {formatDate(match.date)}
+                    {matchdayData.matches.map((match, index) => {
+                      const matchBetlink = betlinkData[match.id];
+                      const isLoading = loadingBetlinks[match.id];
+                      
+                      return (
+                        <div 
+                          key={`match-${index}-${match.id}`}
+                          className="px-6 py-4"
+                        >
+                          <div className="flex flex-col gap-2">
+                            {/* Spiel-Details */}
+                            <div className="flex justify-between items-center">
+                              <div className="flex-1">
+                                <div className="font-medium flex items-center">
+                                  {match.homeTeamImage && renderTeamImage(match.homeTeamImage)}
+                                  <span className="min-w-20 inline-block">{match.homeTeam}</span>
+                                  {match.homeScore !== undefined && match.awayScore !== undefined ? 
+                                    <span className="mx-2 font-bold">{match.homeScore}:{match.awayScore}</span> : 
+                                    <span className="mx-2">-</span>
+                                  }
+                                  <span className="min-w-20 inline-block">{match.awayTeam}</span>
+                                  {match.awayTeamImage && renderTeamImage(match.awayTeamImage)}
+                                </div>
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                  {formatDate(match.date)}
+                                  {match.status !== undefined && 
+                                    <span className="ml-2 px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-xs">
+                                      {getStatusText(match.status)}
+                                    </span>
+                                  }
+                                </div>
+                                <div className="text-xs text-gray-400 dark:text-gray-500">
+                                  Match-ID: {match.id}
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-xs text-gray-400 dark:text-gray-500">
-                              Match-ID: {match.id}
+                            
+                            {/* Wettquoten */}
+                            <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                              {isLoading ? (
+                                <div className="flex items-center justify-center h-8 text-sm text-gray-500">
+                                  <svg className="animate-spin h-4 w-4 mr-2 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Wettquoten werden geladen...
+                                </div>
+                              ) : matchBetlink ? (
+                                <div>
+                                  {matchBetlink.url ? (
+                                    <div className="flex items-center">
+                                      <div className="text-sm text-gray-600 dark:text-gray-300 mr-3">
+                                        <span className="font-medium">Wettquoten:</span> Verfügbar beim Wettanbieter
+                                      </div>
+                                      <a
+                                        href={matchBetlink.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center px-3 py-1 text-xs border border-transparent font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                      >
+                                        {matchBetlink.title || "Zum Wettanbieter"} {matchBetlink.provider ? `(${matchBetlink.provider})` : ''}
+                                      </a>
+                                    </div>
+                                  ) : (
+                                    <div className="text-sm text-yellow-600 dark:text-yellow-400">
+                                      Keine Wettquoten für dieses Spiel verfügbar.
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                  Wettquoten konnten nicht geladen werden.
+                                </div>
+                              )}
                             </div>
-                          </div>
-                          <div className="mt-2 sm:mt-0 flex items-center">
-                            <button
-                              className="px-3 py-1 text-xs bg-green-600 text-white rounded-md hover:bg-green-700"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleBetlinkTest(match.id);
-                              }}
-                            >
-                              Wettquoten
-                            </button>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ) : (
@@ -227,44 +363,6 @@ export default function MatchdayPage() {
                   <p className="text-gray-500 dark:text-gray-400">
                     Keine Spiele für diesen Spieltag gefunden.
                   </p>
-                </div>
-              )}
-              
-              {/* Betlink-Anzeige */}
-              {selectedMatchId && (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
-                  <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                    <h2 className="text-lg font-medium text-gray-900 dark:text-white">Betlink für Match-ID: {selectedMatchId}</h2>
-                  </div>
-                  <div className="p-6">
-                    {betlinkData ? (
-                      <>
-                        {betlinkData.url ? (
-                          <div className="mb-4">
-                            <a
-                              href={betlinkData.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                            >
-                              {betlinkData.title || "Zum Wettanbieter"} {betlinkData.provider ? `(${betlinkData.provider})` : ''}
-                            </a>
-                          </div>
-                        ) : (
-                          <p className="text-yellow-600 dark:text-yellow-400 mb-4">Keine Wett-URL in den Daten gefunden.</p>
-                        )}
-                        
-                        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Vollständige Antwort:</h3>
-                        <pre className="bg-gray-100 dark:bg-gray-900 p-4 rounded-md overflow-auto text-xs text-gray-800 dark:text-gray-200 max-h-[300px]">
-                          {formatJSON(betlinkData)}
-                        </pre>
-                      </>
-                    ) : (
-                      <p className="text-gray-500 dark:text-gray-400">
-                        Keine Betlink-Daten verfügbar.
-                      </p>
-                    )}
-                  </div>
                 </div>
               )}
             </>
