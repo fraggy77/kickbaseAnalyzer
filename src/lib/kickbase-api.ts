@@ -661,13 +661,75 @@ async getTeam(leagueId: string): Promise<any> {
   }
 }
 
+
+
   /**
-   * Spieler des Teams abrufen
+   * Liga-Tabelle abrufen
    */
-  async getPlayers(leagueId: string): Promise<any> {
-    return this.fetch(`/leagues/${leagueId}/me/players`);
+  async getLeagueRanking(leagueId: string): Promise<any> {
+    try {
+      if (!this.token) {
+        throw new Error('Nicht eingeloggt');
+      }
+      
+      console.log('Frontend: Liga-Ranking-Anfrage für ID', leagueId);
+      
+      const response = await fetch(`/api/leagues/${leagueId}/ranking`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+        },
+      });
+
+      // Status-Code protokollieren
+      console.log('Frontend: Liga-Ranking-Anfrage Status:', response.status);
+      
+      // Antwort als Text lesen
+      const responseText = await response.text();
+      console.log('Frontend: Liga-Ranking-Antwort Vorschau:', responseText.substring(0, 100));
+      
+      // Als JSON parsen
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (error) {
+        console.error('Frontend: Fehler beim Parsen der Liga-Ranking-Antwort:', error);
+        throw new Error('Fehler beim Abrufen der Liga-Tabelle: Die Antwort konnte nicht als JSON verarbeitet werden');
+      }
+      
+      // Fehlerprüfung
+      if (!response.ok || data.message) {
+        const errorMessage = data.message || 'Fehler beim Abrufen der Liga-Tabelle';
+        console.error('Frontend: Liga-Ranking-Anfrage fehlgeschlagen:', errorMessage);
+        throw new Error(errorMessage);
+      }
+      
+      // Datenstruktur protokollieren
+      console.log('Frontend: Liga-Ranking-Datenstruktur:', Object.keys(data));
+      if (data && data.us && Array.isArray(data.us)) {
+        data.us = data.us.map(user => {
+          if (user.uim && !user.uim.startsWith('http')) {
+            user.uim = `https://kickbase.b-cdn.net/${user.uim}`;
+          }
+          return user;
+        });
+      }
+      // Daten zurückgeben
+      return data;
+    } catch (error) {
+      console.error('Kickbase API Fehler:', error);
+      throw error;
+    }
   }
 }
 
 // Singleton-Instanz exportieren
 export const kickbaseAPI = new KickbaseAPI();
+
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('de-DE', {
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 0
+  }).format(value);
+};

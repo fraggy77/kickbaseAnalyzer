@@ -62,10 +62,11 @@ export async function GET(request: Request) {
         console.log('Ligen im "it"-Array gefunden, transformiere Daten');
         
         // Format der API-Antwort in das von der App erwartete Format umwandeln
-        const transformedLeagues = data.it.map((league) => ({
+        const transformedLeagues = data.it.map((league: any) => ({
           id: league.i,
           name: league.n,
-          memberCount: league.lpc || 0
+          memberCount: league.lpc || 0,
+          image: league.f
         }));
         
         console.log('Transformierte Ligen:', transformedLeagues);

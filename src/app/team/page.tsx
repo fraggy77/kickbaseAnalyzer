@@ -27,6 +27,9 @@ interface Player {
   tn?: string;
   // Weitere Eigenschaften
   originalData?: any;
+  // Zusätzliche Felder
+  mvgl?: number;  // Marktwert Gewinn/Verlust
+  pim?: string;   // Player Image
 }
 
 export default function TeamPage() {
@@ -88,10 +91,20 @@ export default function TeamPage() {
         if (teamData.pl.length > 0) {
           console.log('Beispiel-Spieler:', teamData.pl[0]);
         }
+        
+        // Marktwerte aufaddieren
+        const calculatedTeamValue = teamData.pl.reduce((sum, player) => {
+          // Berücksichtige die verschiedenen möglichen Marktwert-Felder
+          const playerValue = player.marketValue || player.mv || (player.originalData && player.originalData.mv) || 0;
+          return sum + playerValue;
+        }, 0);
+        
+        console.log('Berechneter Teamwert:', calculatedTeamValue);
+        
         setPlayers(teamData.pl);
         setTeamInfo({
           budget: teamData.b || teamData.budget || 0,
-          teamValue: teamData.teamValue || teamData.tv || 0,
+          teamValue: calculatedTeamValue, // Hier den berechneten Wert verwenden
           name: teamData.tn || teamData.lnm || 'Mein Team',
           points: teamData.tp || 0,
           rank: teamData.tr || 0
@@ -101,7 +114,7 @@ export default function TeamPage() {
         setPlayers([]);
         setTeamInfo({
           budget: teamData.b || teamData.budget || 0,
-          teamValue: teamData.teamValue || teamData.tv || 0,
+          teamValue: 0, // Kein Teamwert ohne Spieler
           name: teamData.tn || teamData.lnm || 'Mein Team',
           points: teamData.tp || 0,
           rank: teamData.tr || 0
@@ -137,17 +150,21 @@ export default function TeamPage() {
 
   const getStatusName = (status: number) => {
     switch (status) {
-      case 0: return 'Unbekannt';
+      case 0: return 'Fit';
       case 1: return 'Fit';
       case 2: return 'Verletzt';
       case 3: return 'Fraglich';
-      default: return 'Unbekannt';
+      default: return 'Fit';
     }
   };
 
-  // Formatiert Geldbeträge in Euro mit Tausenderpunkten
+  // Formatiert Geldbeträge in Euro mit Tausenderpunkten ohne Nachkommastellen
   const formatCurrency = (value: number = 0) => {
-    return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
+    return new Intl.NumberFormat('de-DE', { 
+      style: 'currency', 
+      currency: 'EUR', 
+      maximumFractionDigits: 0 
+    }).format(value);
   };
 
   // Normalisiert Spielerdaten für einheitliche Darstellung
@@ -161,7 +178,10 @@ export default function TeamPage() {
       position: player.position || player.pos || 0,
       status: player.status || player.st || 0,
       marketValue: player.marketValue || player.mv || 0,
-      points: player.points || player.p || 0
+      points: player.points || player.p || 0,
+      // Neue Felder
+      mvgl: player.mvgl || (player.originalData && player.originalData.mvgl) || 0,
+      pim: player.pim || (player.originalData && player.originalData.pim) || ''
     };
   };
 
@@ -263,6 +283,9 @@ export default function TeamPage() {
                           Marktwert
                         </th>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Profit
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Punkte
                         </th>
                       </tr>
@@ -275,6 +298,18 @@ export default function TeamPage() {
                             <tr key={normalizedPlayer.id}>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center">
+                                  {normalizedPlayer.pim && (
+                                    <div className="flex-shrink-0 h-10 w-10 mr-3">
+                                      <img 
+                                        className="h-10 w-10 rounded-full object-cover" 
+                                        src={normalizedPlayer.pim.startsWith('http') ? normalizedPlayer.pim : `https://kickbase.b-cdn.net/${normalizedPlayer.pim}`} 
+                                        alt={`${normalizedPlayer.lastName}`} 
+                                        onError={(e) => {
+                                          e.currentTarget.src = 'https://via.placeholder.com/40';
+                                        }}
+                                      />
+                                    </div>
+                                  )}
                                   <div>
                                     <div className="text-sm font-medium text-gray-900 dark:text-white">
                                       {normalizedPlayer.firstName} {normalizedPlayer.lastName}
@@ -290,7 +325,7 @@ export default function TeamPage() {
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                  normalizedPlayer.status === 1 
+                                  normalizedPlayer.status === 1 || normalizedPlayer.status === 0
                                     ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
                                     : normalizedPlayer.status === 2 
                                     ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' 
@@ -301,6 +336,15 @@ export default function TeamPage() {
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                 {formatCurrency(normalizedPlayer.marketValue)}
+                              </td>
+                              <td className={`px-6 py-4 whitespace-nowrap text-sm ${
+                                normalizedPlayer.mvgl > 0 
+                                  ? 'text-green-600 dark:text-green-400' 
+                                  : normalizedPlayer.mvgl < 0 
+                                  ? 'text-red-600 dark:text-red-400' 
+                                  : 'text-gray-500 dark:text-gray-400'
+                              }`}>
+                                {formatCurrency(normalizedPlayer.mvgl)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                 {normalizedPlayer.points}
