@@ -238,6 +238,51 @@ class KickbaseAPI {
   }
 
 
+    // In src/lib/kickbase-api.ts
+
+  /**
+   * Ruft die /me-Daten für eine Liga ab (Budget etc.)
+   */
+  async getLeagueMe(leagueId: string): Promise<any> {
+    try {
+      if (!this.token) {
+        throw new Error('Nicht eingeloggt');
+      }
+      console.log('Frontend: /me Anfrage für Liga', leagueId);
+      const response = await fetch(`/api/leagues/${leagueId}/me`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+        },
+      });
+
+      console.log('Frontend: /me Anfrage Status:', response.status);
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        let errorMessage = `Fehler bei /me Anfrage: ${response.status}`;
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.message || errorMessage;
+        } catch { /* Ignoriere Parse-Fehler für Fehlermeldung */ }
+        console.error('Frontend: /me Anfrage fehlgeschlagen:', errorMessage, responseText.substring(0, 100));
+        throw new Error(errorMessage);
+      }
+
+      try {
+        const data = JSON.parse(responseText);
+        console.log('Frontend: /me Daten empfangen:', Object.keys(data));
+        return data;
+      } catch (error) {
+        console.error('Frontend: Fehler beim Parsen der /me Antwort:', error, responseText.substring(0,100));
+        throw new Error('Fehler beim Verarbeiten der Ligainformationen');
+      }
+    } catch (error) {
+      console.error('Kickbase API /me Fehler:', error);
+      throw error;
+    }
+  }
+
   /**
  * Alle Spiele abrufen
  */

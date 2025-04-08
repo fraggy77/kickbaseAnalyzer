@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { kickbaseAPI } from '@/lib/kickbase-api';
+import { formatCurrency } from '@/utils/formatting.utils';
 
 interface RankingUser {
   i: string;       // ID
@@ -106,13 +107,6 @@ export default function LeagueTablePage() {
     router.push(`/dashboard?league=${leagueId}`);
   };
 
-  const formatTeamValue = (value: number) => {
-    return new Intl.NumberFormat('de-DE', {
-      style: 'currency',
-      currency: 'EUR',
-      maximumFractionDigits: 0
-    }).format(value);
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950 dark:to-blue-950">
@@ -233,7 +227,7 @@ export default function LeagueTablePage() {
   </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900 dark:text-white">
-                          {formatTeamValue(user.tv)}
+                          {formatCurrency(user.tv)}
                         </td>
                       </tr>
                     ))}

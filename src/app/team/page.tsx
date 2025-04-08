@@ -3,34 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { kickbaseAPI } from '@/lib/kickbase-api';
+import { formatCurrency } from '@/utils/formatting.utils';
+import { getPositionName } from '@/utils/player.utils';
+import { getStatusName, getTeamName } from '@/utils/player.utils';
+import { normalizePlayer } from '@/utils/player.utils';
+import { Player } from '@/types/player.types';
 
-interface Player {
-  id: string;
-  firstName?: string;
-  lastName?: string;
-  teamId?: string;
-  teamName?: string;
-  position?: number;
-  status?: number;
-  marketValue?: number;
-  points?: number;
-  // Kickbase API fields
-  i?: string;
-  n?: string;
-  fn?: string;
-  ln?: string;
-  pos?: number;
-  st?: number;
-  mv?: number;
-  p?: number;
-  ti?: string;
-  tn?: string;
-  // Weitere Eigenschaften
-  originalData?: any;
-  // Zusätzliche Felder
-  mvgl?: number;  // Marktwert Gewinn/Verlust
-  pim?: string;   // Player Image
-}
+
 
 export default function TeamPage() {
   const router = useRouter();
@@ -80,51 +59,58 @@ export default function TeamPage() {
   const loadTeamData = async () => {
     try {
       setIsLoading(true);
-      
-      // Team-Daten abrufen
-      const teamData = await kickbaseAPI.getTeam(leagueId as string);
-      console.log('Team-Daten geladen:', teamData);
-      
-      // Spieler-Array extrahieren und setzen
-      if (teamData && teamData.pl && Array.isArray(teamData.pl)) {
-        console.log(`${teamData.pl.length} Spieler geladen`);
-        if (teamData.pl.length > 0) {
-          console.log('Beispiel-Spieler:', teamData.pl[0]);
+      setError(''); // Fehler zurücksetzen
+
+      // Beide API-Aufrufe parallel starten
+      const [squadResponse, meResponse] = await Promise.all([
+        kickbaseAPI.getTeam(leagueId as string), // Ruft jetzt /api/.../squad auf
+        kickbaseAPI.getLeagueMe(leagueId as string) // Ruft /api/.../me auf
+      ]);
+
+      console.log('Squad-Daten geladen:', squadResponse);
+      console.log('/me-Daten geladen:', meResponse);
+
+      // Spieler aus squadResponse extrahieren
+      const playersData = squadResponse?.pl;
+      if (playersData && Array.isArray(playersData)) {
+        console.log(`${playersData.length} Spieler geladen`);
+        if (playersData.length > 0) {
+          console.log('Beispiel-Spieler:', playersData[0]);
         }
-        
-        // Marktwerte aufaddieren
-        const calculatedTeamValue = teamData.pl.reduce((sum, player) => {
-          // Berücksichtige die verschiedenen möglichen Marktwert-Felder
-          const playerValue = player.marketValue || player.mv || (player.originalData && player.originalData.mv) || 0;
+        setPlayers(playersData);
+
+        // Marktwerte aus Spielerdaten berechnen
+        const calculatedTeamValue = playersData.reduce((sum, player) => {
+          const playerValue = player.marketValue || player.mv || 0;
           return sum + playerValue;
         }, 0);
-        
         console.log('Berechneter Teamwert:', calculatedTeamValue);
-        
-        setPlayers(teamData.pl);
+
+        // Team-Infos aus meResponse und berechnetem Wert setzen
         setTeamInfo({
-          budget: teamData.b || teamData.budget || 0,
-          teamValue: calculatedTeamValue, // Hier den berechneten Wert verwenden
-          name: teamData.tn || teamData.lnm || 'Mein Team',
-          points: teamData.tp || 0,
-          rank: teamData.tr || 0
+          budget: meResponse?.b || 0, // Budget aus /me
+          teamValue: calculatedTeamValue, // Berechneter Wert
+          name: meResponse?.tn || 'Mein Team', // Teamname aus /me, falls vorhanden
+          points: meResponse?.tp || 0, // Punkte aus /me
+          rank: meResponse?.tr || 0, // Rang aus /me
         });
+
       } else {
-        console.warn('Keine Spieler in den Team-Daten gefunden');
+        console.warn('Keine Spielerdaten (pl) in der Squad-Antwort gefunden');
         setPlayers([]);
+        // TeamInfo trotzdem mit Daten aus /me setzen (ohne berechneten Teamwert)
         setTeamInfo({
-          budget: teamData.b || teamData.budget || 0,
-          teamValue: 0, // Kein Teamwert ohne Spieler
-          name: teamData.tn || teamData.lnm || 'Mein Team',
-          points: teamData.tp || 0,
-          rank: teamData.tr || 0
+          budget: meResponse?.b || 0,
+          teamValue: 0,
+          name: meResponse?.tn || 'Mein Team',
+          points: meResponse?.tp || 0,
+          rank: meResponse?.tr || 0,
         });
       }
+
     } catch (error: any) {
-      console.error('Fehler beim Laden der Team-Daten:', error);
-      setError('Die Team-Daten konnten nicht geladen werden. ' + error.message);
-      
-      // Bei Authentifizierungsfehlern zurück zum Login
+      console.error('Fehler beim Laden der Team-Daten (kombiniert):', error);
+      setError(`Die Team-Daten konnten nicht geladen werden: ${error.message}`);
       if (error.message.includes('401') || error.message.includes('Unauthoriz')) {
         localStorage.removeItem('kickbaseUser');
         router.push('/');
@@ -138,52 +124,11 @@ export default function TeamPage() {
     router.push(`/dashboard?league=${leagueId}`);
   };
 
-  const getPositionName = (position: number) => {
-    switch (position) {
-      case 1: return 'Torwart';
-      case 2: return 'Abwehr';
-      case 3: return 'Mittelfeld';
-      case 4: return 'Sturm';
-      default: return 'Unbekannt';
-    }
-  };
 
-  const getStatusName = (status: number) => {
-    switch (status) {
-      case 0: return 'Fit';
-      case 1: return 'Fit';
-      case 2: return 'Verletzt';
-      case 3: return 'Fraglich';
-      default: return 'Fit';
-    }
-  };
 
-  // Formatiert Geldbeträge in Euro mit Tausenderpunkten ohne Nachkommastellen
-  const formatCurrency = (value: number = 0) => {
-    return new Intl.NumberFormat('de-DE', { 
-      style: 'currency', 
-      currency: 'EUR', 
-      maximumFractionDigits: 0 
-    }).format(value);
-  };
 
-  // Normalisiert Spielerdaten für einheitliche Darstellung
-  const normalizePlayer = (player: Player) => {
-    return {
-      id: player.id || player.i || '',
-      firstName: player.firstName || player.fn || '',
-      lastName: player.lastName || player.n || player.ln || '',
-      teamId: player.teamId || player.ti || '',
-      teamName: player.teamName || player.tn || '',
-      position: player.position || player.pos || 0,
-      status: player.status || player.st || 0,
-      marketValue: player.marketValue || player.mv || 0,
-      points: player.points || player.p || 0,
-      // Neue Felder
-      mvgl: player.mvgl || (player.originalData && player.originalData.mvgl) || 0,
-      pim: player.pim || (player.originalData && player.originalData.pim) || ''
-    };
-  };
+ 
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950 dark:to-blue-950">
@@ -318,7 +263,7 @@ export default function TeamPage() {
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-500 dark:text-gray-400">{normalizedPlayer.teamName}</div>
+                                <div className="text-sm text-gray-500 dark:text-gray-400">{getTeamName(normalizedPlayer.teamId)}</div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-500 dark:text-gray-400">{getPositionName(normalizedPlayer.position)}</div>
