@@ -186,37 +186,35 @@ export default function LeagueTablePage() {
                           {user.spl}.
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
+                          <button
+                            onClick={() => router.push(`/manager-squad?league=${leagueId}&user=${user.i}`)}
+                            className="flex items-center group cursor-pointer w-full text-left hover:bg-gray-100 dark:hover:bg-gray-700 px-2 py-1 rounded transition-colors duration-150"
+                          >
                             {user.uim ? (
-                              <div className="h-10 w-10 flex-shrink-0">
-                                <img 
-                                  src={user.uim} 
-                                  alt={`${user.n} Profilbild`} 
-                                  className="h-10 w-10 rounded-full"
+                              <div className="h-10 w-10 flex-shrink-0 mr-3">
+                                <img
+                                  src={user.uim}
+                                  alt={`${user.n} Profilbild`}
+                                  className={`h-10 w-10 rounded-full object-cover transition-all ${/* kickbaseAPI.userId !== user.i ? */ 'group-hover:ring-2 group-hover:ring-offset-2 group-hover:ring-green-500 dark:group-hover:ring-offset-gray-800' /* : '' */}`}
                                   onError={(e) => {
-                                    // Fallback bei Bildfehler
                                     e.currentTarget.src = 'https://via.placeholder.com/40';
-                                  }}  
+                                  }}
                                 />
                               </div>
                             ) : (
-                              <div className="h-10 w-10 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                                <svg className="h-6 w-6 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                                </svg>
+                              <div className={`h-10 w-10 flex-shrink-0 mr-3 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center transition-all ${/* kickbaseAPI.userId !== user.i ? */ 'group-hover:ring-2 group-hover:ring-offset-2 group-hover:ring-green-500 dark:group-hover:ring-offset-gray-800' /* : '' */}`}>
+                                <svg className="h-6 w-6 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
                               </div>
                             )}
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            <div className="ml-0">
+                              <div className={`text-sm font-medium transition-colors ${/* kickbaseAPI.userId !== user.i ? */ 'text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400' /* : 'text-gray-500 dark:text-gray-400' */}`}>
                                 {user.n}
                               </div>
                               {user.adm && (
-                                <div className="text-xs text-gray-500 dark:text-gray-400">
-                                  Admin
-                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">Admin</div>
                               )}
                             </div>
-                          </div>
+                          </button>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900 dark:text-white">
                           {user.sp.toLocaleString()}

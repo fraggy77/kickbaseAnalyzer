@@ -1,5 +1,5 @@
 import { Player } from '@/types/player.types';
-import { teamMapping } from './teamMapping';
+import { teamMapping, fallbackTeamData, TeamMapEntry } from '@/utils/teamMapping';
 
 export const getPositionName = (position: number) => {
     switch (position) {
@@ -21,11 +21,15 @@ export const getPositionName = (position: number) => {
     }
   };
 
-  export const getTeamName = (teamId: string): string => {
-    console.log(`getTeamName called with ID: '${teamId}' (Type: ${typeof teamId})`); // Logge die ID und ihren Typ
-    const mappedName = teamMapping[teamId];
-    console.log(` -> Mapped name: ${mappedName}`); // Logge das Ergebnis des Mappings
-    return mappedName || `Team ID: ${teamId}`;
+  export const getTeamData = (teamId: string): TeamMapEntry => {
+    const idAsString = String(teamId);
+    console.log(`getTeamData called with ID: '${idAsString}'`);
+    const teamData = teamMapping[idAsString];
+    if (!teamData) {
+      console.warn(`Kein Mapping für Team ID '${idAsString}' gefunden.`);
+      return { ...fallbackTeamData, name: `Team ID: ${idAsString}` };
+    }
+    return teamData;
   };
 
     // Normalisiert Spielerdaten für einheitliche Darstellung
@@ -37,8 +41,7 @@ export const getPositionName = (position: number) => {
       id: player.id || player.i || '',
       firstName: player.firstName || player.fn || '',
       lastName: player.lastName || player.n || player.ln || '',
-      teamId: player.teamId || player.ti || '',
-      teamName: player.teamName || player.tn || '',
+      teamId: String(player.teamId || player.ti || ''),
       position: player.position || player.pos || 0,
       status: player.status || player.st || 0,
       marketValue: player.marketValue || player.mv || 0,

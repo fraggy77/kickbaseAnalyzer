@@ -4,25 +4,29 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { kickbaseAPI } from '@/lib/kickbase-api';
 import { formatCurrency } from '@/utils/formatting.utils';
-import { getPositionName } from '@/utils/player.utils';
-import { getStatusName, getTeamData } from '@/utils/player.utils';
-import { normalizePlayer } from '@/utils/player.utils';
+import { getPositionName, getStatusName, getTeamData, normalizePlayer } from '@/utils/player.utils';
 import { Player } from '@/types/player.types';
 
+// Interface für die Manager-Info (optional, aber gut für Typsicherheit)
+interface ManagerInfo {
+  name: string;
+  teamValue: number;
+  managerImage?: string;
+  // Keine Budget-, Rang-, Punkte-Felder hier
+}
 
-
-export default function TeamPage() {
+export default function ManagerSquadPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const leagueId = searchParams.get('league');
+  const userId = searchParams.get('user');
   
   const [players, setPlayers] = useState<Player[]>([]);
-  const [teamInfo, setTeamInfo] = useState<any>(null);
+  const [managerInfo, setManagerInfo] = useState<ManagerInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Überprüfe, ob der Benutzer angemeldet ist
     const checkAuth = () => {
       const storedUser = localStorage.getItem('kickbaseUser');
       if (!storedUser) {
@@ -45,33 +49,29 @@ export default function TeamPage() {
       }
     };
 
-    // Wenn kein League-Parameter übergeben wurde, zurück zur Liga-Auswahl
-    if (!leagueId) {
+    if (!leagueId || !userId) {
+      console.error('Fehlende League ID oder User ID in URL');
       router.push('/leagues');
       return;
     }
 
     if (checkAuth()) {
-      loadTeamData();
+      loadManagerData();
     }
-  }, [leagueId, router]);
+  }, [leagueId, userId, router]);
 
-  const loadTeamData = async () => {
+  const loadManagerData = async () => {
+    if (!leagueId || !userId) return;
+
     try {
       setIsLoading(true);
-      setError(''); // Fehler zurücksetzen
+      setError('');
 
-      // Beide API-Aufrufe parallel starten
-      const [squadResponse, meResponse] = await Promise.all([
-        kickbaseAPI.getTeam(leagueId as string), // Ruft jetzt /api/.../squad auf
-        kickbaseAPI.getLeagueMe(leagueId as string) // Ruft /api/.../me auf
-      ]);
+      const responseData = await kickbaseAPI.getManagerSquad(leagueId, userId);
 
-      console.log('Squad-Daten geladen:', squadResponse);
-      console.log('/me-Daten geladen:', meResponse);
+      console.log('Manager-Squad Daten geladen:', responseData);
 
-      // Spieler aus squadResponse extrahieren
-      const playersData = squadResponse?.pl;
+      const playersData = responseData?.pl;
       if (playersData && Array.isArray(playersData)) {
         console.log(`${playersData.length} Spieler geladen`);
         if (playersData.length > 0) {
@@ -79,38 +79,31 @@ export default function TeamPage() {
         }
         setPlayers(playersData);
 
-        // Marktwerte aus Spielerdaten berechnen
         const calculatedTeamValue = playersData.reduce((sum, player) => {
           const playerValue = player.marketValue || player.mv || 0;
           return sum + playerValue;
         }, 0);
-        console.log('Berechneter Teamwert:', calculatedTeamValue);
+        console.log('Berechneter Teamwert des Managers:', calculatedTeamValue);
 
-        // Team-Infos aus meResponse und berechnetem Wert setzen
-        setTeamInfo({
-          budget: meResponse?.b || 0, // Budget aus /me
-          teamValue: calculatedTeamValue, // Berechneter Wert
-          name: meResponse?.tn || 'Mein Team', // Teamname aus /me, falls vorhanden
-          points: meResponse?.tp || 0, // Punkte aus /me
-          rank: meResponse?.tr || 0, // Rang aus /me
+        setManagerInfo({
+          name: responseData?.managerName || 'Unbekannter Manager',
+          teamValue: calculatedTeamValue,
+          managerImage: responseData?.managerImage || '',
         });
 
       } else {
-        console.warn('Keine Spielerdaten (pl) in der Squad-Antwort gefunden');
+        console.warn('Keine Spielerdaten (pl) in der Manager-Squad-Antwort gefunden');
         setPlayers([]);
-        // TeamInfo trotzdem mit Daten aus /me setzen (ohne berechneten Teamwert)
-        setTeamInfo({
-          budget: meResponse?.b || 0,
+        setManagerInfo({
+          name: responseData?.managerName || 'Unbekannter Manager',
           teamValue: 0,
-          name: meResponse?.tn || 'Mein Team',
-          points: meResponse?.tp || 0,
-          rank: meResponse?.tr || 0,
+          managerImage: responseData?.managerImage || '',
         });
       }
 
     } catch (error: any) {
-      console.error('Fehler beim Laden der Team-Daten (kombiniert):', error);
-      setError(`Die Team-Daten konnten nicht geladen werden: ${error.message}`);
+      console.error('Fehler beim Laden der Manager-Squad-Daten:', error);
+      setError(`Der Kader konnte nicht geladen werden: ${error.message}`);
       if (error.message.includes('401') || error.message.includes('Unauthoriz')) {
         localStorage.removeItem('kickbaseUser');
         router.push('/');
@@ -121,25 +114,21 @@ export default function TeamPage() {
   };
 
   const handleBack = () => {
-    router.push(`/dashboard?league=${leagueId}`);
+    router.push(`/league-table?league=${leagueId}`);
   };
 
-
-
-
- 
-
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950 dark:to-blue-950">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950">
       <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Mein Team</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+            Kader von {managerInfo?.name || '...'}
+          </h1>
           <button
             onClick={handleBack}
             className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
           >
-            Zurück
+            Zurück zur Tabelle
           </button>
         </div>
       </header>
@@ -148,11 +137,11 @@ export default function TeamPage() {
         <div className="px-4 py-6 sm:px-0">
           {isLoading ? (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex justify-center">
-              <svg className="animate-spin h-8 w-8 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Team-Daten werden geladen...</span>
+              <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Kader wird geladen...</span>
             </div>
           ) : error ? (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
@@ -171,35 +160,41 @@ export default function TeamPage() {
             </div>
           ) : (
             <>
-              {/* Team-Übersicht */}
-              {teamInfo && (
+              {managerInfo && (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
-                  <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                    <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-                      {teamInfo.name}
-                    </h2>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      {teamInfo.rank ? `Platz ${teamInfo.rank} • ` : ''}{teamInfo.points || 0} Punkte
-                    </p>
-                  </div>
-                  <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start">
+                    {managerInfo.managerImage && (
+                      <img
+                        src={managerInfo.managerImage.startsWith('http') ? managerInfo.managerImage : `https://kickbase.b-cdn.net/${managerInfo.managerImage}`}
+                        alt={`${managerInfo.name} Bild`}
+                        className="h-12 w-12 rounded-full object-cover"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    )}
                     <div>
-                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Budget</h3>
-                      <p className="mt-1 text-lg font-semibold text-green-600 dark:text-green-400">
-                        {formatCurrency(teamInfo.budget)}
+                      <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                        {managerInfo.name}
+                      </h2>
+                      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        Teamwert: {formatCurrency(managerInfo.teamValue)}
                       </p>
                     </div>
                     <div>
-                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Teamwert</h3>
-                      <p className="mt-1 text-lg font-semibold text-blue-600 dark:text-blue-400">
-                        {formatCurrency(teamInfo.teamValue)}
-                      </p>
+                      <button
+                        onClick={() => router.push(`/manager-performance?league=${leagueId}&user=${userId}`)}
+                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 shadow-sm text-xs font-medium rounded text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        <svg className="-ml-0.5 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M2 10a8 8 0 1116 0 8 8 0 01-16 0z" />
+                          <path d="M12 14a1 1 0 01-.707-.293l-4-4a1 1 0 111.414-1.414L12 11.586l3.293-3.293a1 1 0 011.414 1.414l-4 4A1 1 0 0112 14z" />
+                        </svg>
+                        Performance
+                      </button>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Spielerliste */}
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
                 <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
                   <h2 className="text-lg font-medium text-gray-900 dark:text-white">Spieler</h2>
@@ -212,27 +207,13 @@ export default function TeamPage() {
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead className="bg-gray-50 dark:bg-gray-700">
                       <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Spieler
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Team
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Position
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Marktwert
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Profit
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Punkte
-                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Spieler</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Team</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Position</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Marktwert</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Profit</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Punkte</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -263,44 +244,37 @@ export default function TeamPage() {
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                {/* Hole die Teamdaten */}
                                 {(() => {
                                   const teamData = getTeamData(normalizedPlayer.teamId);
                                   if (teamData.logo) {
-                                    // Wenn ein Logo vorhanden ist, zeige Logo UND Namen an
                                     return (
-                                      // Verwende Flexbox, um Logo und Namen nebeneinander zu platzieren
-                                      <div className="flex items-center space-x-2"> {/* space-x-2 für Abstand */}
-                                        <div className="flex-shrink-0 h-8 w-8"> {/* Container für das Bild */}
+                                      <div className="flex items-center space-x-2">
+                                        <div className="flex-shrink-0 h-8 w-8">
                                           <img
                                             src={`https://kickbase.b-cdn.net/${teamData.logo}`}
                                             alt={teamData.name}
                                             title={teamData.name}
-                                            className="h-full w-full object-contain" // Füllt den Container, behält Seitenverhältnis
+                                            className="h-full w-full object-contain"
                                             onError={(e) => {
                                               e.currentTarget.style.display = 'none';
-                                              // Optional: Nur Namen anzeigen, wenn Bild fehlt
                                               const parentDiv = e.currentTarget.closest('div.flex-shrink-0');
                                               if (parentDiv && parentDiv.nextSibling && parentDiv.nextSibling.textContent === '') {
                                                  (parentDiv.nextSibling as HTMLElement).textContent = teamData.name;
                                               } else if (parentDiv) {
-                                                // Wenn der Text-Span noch nicht existiert
-                                                 const nameSpan = document.createElement('span');
-                                                 nameSpan.className = 'text-sm text-gray-500 dark:text-gray-400';
-                                                 nameSpan.textContent = teamData.name;
-                                                 parentDiv.parentElement?.appendChild(nameSpan);
+                                                const nameSpan = document.createElement('span');
+                                                nameSpan.className = 'text-sm text-gray-500 dark:text-gray-400';
+                                                nameSpan.textContent = teamData.name;
+                                                parentDiv.parentElement?.appendChild(nameSpan);
                                               }
                                             }}
                                           />
                                         </div>
-                                        {/* Span für den Teamnamen neben dem Logo */}
                                         <span className="text-sm text-gray-500 dark:text-gray-400 truncate" title={teamData.name}>
                                           {teamData.name}
                                         </span>
                                       </div>
                                     );
                                   } else {
-                                    // Fallback, wenn kein Logo im Mapping ist, zeige nur den Namen
                                     return <div className="text-sm text-gray-500 dark:text-gray-400">{teamData.name}</div>;
                                   }
                                 })()}
@@ -338,11 +312,7 @@ export default function TeamPage() {
                           );
                         })
                       ) : (
-                        <tr>
-                          <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                            Keine Spieler gefunden.
-                          </td>
-                        </tr>
+                        <tr><td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">Keine Spieler gefunden.</td></tr>
                       )}
                     </tbody>
                   </table>

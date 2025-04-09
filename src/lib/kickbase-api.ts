@@ -283,6 +283,84 @@ class KickbaseAPI {
     }
   }
 
+  // In src/lib/kickbase-api.ts
+
+  /**
+   * Ruft den Kader eines bestimmten Managers in einer Liga ab.
+   */
+  async getManagerSquad(leagueId: string, userId: string): Promise<any> {
+    try {
+      if (!this.token) {
+        throw new Error('Nicht eingeloggt');
+      }
+      console.log(`Frontend: Manager-Squad Anfrage für Liga ${leagueId}, User ${userId}`);
+      const response = await fetch(`/api/leagues/${leagueId}/managers/${userId}/squad`, { // Korrekter interner Pfad
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+        },
+      });
+
+      console.log(`Frontend: Manager-Squad Anfrage Status: ${response.status}`);
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        let errorMessage = `Fehler bei Manager-Squad Anfrage: ${response.status}`;
+        try { const errorData = JSON.parse(responseText); errorMessage = errorData.message || errorMessage; } catch {}
+        console.error('Frontend: Manager-Squad Anfrage fehlgeschlagen:', errorMessage, responseText.substring(0, 100));
+        throw new Error(errorMessage);
+      }
+
+      try {
+        const data = JSON.parse(responseText);
+        console.log('Frontend: Manager-Squad Daten empfangen:', data);
+        return data;
+      } catch (error) {
+        console.error('Frontend: Fehler beim Parsen der Manager-Squad Antwort:', error, responseText.substring(0,100));
+        throw new Error('Fehler beim Verarbeiten der Manager-Squad Daten');
+      }
+    } catch (error) {
+      console.error('Kickbase API Manager-Squad Fehler:', error);
+      throw error;
+    }
+  }
+
+
+  // In src/lib/kickbase-api.ts
+
+  /**
+   * Ruft die Performance-Daten eines Managers ab.
+   */
+  async getManagerPerformance(leagueId: string, userId: string): Promise<any> {
+    try {
+      if (!this.token) throw new Error('Nicht eingeloggt');
+      console.log(`Frontend: Performance Anfrage für Liga ${leagueId}, User ${userId}`);
+      const response = await fetch(`/api/leagues/${leagueId}/managers/${userId}/performance`, { // Korrekter interner Pfad
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${this.token}` },
+      });
+      console.log(`Frontend: Performance Anfrage Status: ${response.status}`);
+      const responseText = await response.text();
+      if (!response.ok) {
+        let errorMessage = `Fehler bei Performance Anfrage: ${response.status}`;
+        try { const errorData = JSON.parse(responseText); errorMessage = errorData.message || errorMessage; } catch {}
+        console.error('Frontend: Performance Anfrage fehlgeschlagen:', errorMessage, responseText.substring(0, 100));
+        throw new Error(errorMessage);
+      }
+      try {
+        const data = JSON.parse(responseText);
+        console.log('Frontend: Performance Daten empfangen');
+        return data;
+      } catch (error) {
+        console.error('Frontend: Fehler beim Parsen der Performance Antwort:', error, responseText.substring(0,100));
+        throw new Error('Fehler beim Verarbeiten der Performance Daten');
+      }
+    } catch (error) {
+      console.error('Kickbase API Performance Fehler:', error);
+      throw error;
+    }
+  }
+
   /**
  * Alle Spiele abrufen
  */
