@@ -1,147 +1,99 @@
 import { NextResponse } from 'next/server';
+import type { League } from '@/types/league.types'; // Importiere den League-Typ
 
 export async function POST(request: Request) {
   try {
     const { email, password } = await request.json();
+    // console.log('API Auth: Login-Versuch für:', email);
 
-    console.log('Login-Versuch für:', email);
-    
-    // Implementiere Retry-Mechanismus für mehr Zuverlässigkeit
-    let attempts = 0;
-    const maxAttempts = 3;
-    let lastError = null;
-    
-    while (attempts < maxAttempts) {
-      attempts++;
-      console.log(`Versuch ${attempts} von ${maxAttempts}`);
-      
-      try {
-        // API-Anfrage mit aktualisiertem User-Agent
-        const response = await fetch('https://api.kickbase.com/v4/user/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'User-Agent': 'Kickbase/iOS 6.9.0', // Aktuellere Version verwenden
-            'Accept': 'application/json',
-            'Accept-Language': 'de-DE',
-          },
-          body: JSON.stringify({ 
-            em: email, 
-            pass: password,
-            loy: false,
-            rep: {}
-          }),
-        });
+    // API-Anfrage an Kickbase (nur ein Versuch)
+    const response = await fetch('https://api.kickbase.com/v4/user/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Kickbase/iOS 6.9.0', // Aktuelle Version verwenden
+        'Accept': 'application/json',
+        'Accept-Language': 'de-DE',
+      },
+      body: JSON.stringify({
+        em: email,
+        pass: password,
+        loy: false, // Was bedeutet das? Kann evtl. entfernt werden?
+        rep: {}     // Was bedeutet das? Kann evtl. entfernt werden?
+      }),
+    });
 
-        // Ausführliches Logging für Debugging
-        console.log('Response-Status:', response.status);
-        console.log('Response-Headers:', {
-          contentType: response.headers.get('content-type'),
-          server: response.headers.get('server'),
-        });
-        
-        // Response als Text lesen
-        const responseText = await response.text();
-        
-        // Mehr Logging
-        console.log('Response-Text-Länge:', responseText.length);
-        console.log('Response-Vorschau:', responseText.substring(0, 200));
-        
-        // Prüfen auf leere Antwort
-        if (!responseText || responseText.trim() === '') {
-          console.error('Leere Antwort vom Server erhalten');
-          throw new Error('Leere Antwort vom Server');
-        }
-        
-        // HTML-Check
-        if (responseText.includes('<!DOCTYPE') || responseText.includes('<html')) {
-          console.error('HTML statt JSON erhalten');
-          throw new Error('HTML statt JSON erhalten');
-        }
-        
-        // Als JSON parsen
-        let data;
-        try {
-          data = JSON.parse(responseText);
-          
-          // Detailliertes Logging der Antwortstruktur
-          console.log('Antwort-Keys:', Object.keys(data));
-          
-          // Prüfen auf bekannte Fehlermeldung "ClientTooOld"
-          if (data.err === 5 && data.errMsg === "ClientTooOld") {
-            console.error('API meldet veralteten Client');
-            return NextResponse.json(
-              { message: 'Login fehlgeschlagen: Die Kickbase-API meldet, dass der Client zu alt ist' },
-              { status: 400 }
-            );
-          }
-          
-          if (data.tkn) console.log('Token gefunden:', data.tkn.substring(0, 20) + '...');
-          else console.log('Kein Token in der Antwort gefunden');
-          
-          if (data.u) console.log('Benutzer-Keys:', Object.keys(data.u));
-          else console.log('Kein Benutzer in der Antwort gefunden');
-          
-        } catch (error) {
-          console.error('Fehler beim Parsen der Antwort als JSON:', error);
-          throw new Error('Antwort konnte nicht als JSON verarbeitet werden');
-        }
-        
-        // Fehlerprüfung
-        if (!response.ok) {
-          const errorMessage = data?.message || data?.errMsg || response.statusText || 'Unbekannter Fehler';
-          throw new Error(`API-Fehler: ${errorMessage}`);
-        }
-        
-        // Bei erfolgreicher Antwort - echtes Token und Benutzerdaten zurückgeben
-        if (data.tkn && data.u) {
-          // Antwort in erwartetes Format umwandeln
-          const formattedResponse = {
-            token: data.tkn,
-            user: {
-              id: data.u.id,
-              name: data.u.name,
-              email: data.u.email || email
-            }
-          };
-          
-          console.log('Login erfolgreich - formatierte Antwort:', 
-            JSON.stringify({
-              token: formattedResponse.token.substring(0, 20) + '...',
-              user: formattedResponse.user
-            })
-          );
-          
-          return NextResponse.json(formattedResponse);
-        } else {
-          console.error('Antwort enthält kein Token oder Benutzerdaten');
-          throw new Error('Kein Token oder Benutzerdaten in der Antwort');
-        }
-      } catch (error: any) {
-        console.error(`Fehler beim Versuch ${attempts}:`, error.message);
-        lastError = error;
-        
-        // Kurz warten vor dem nächsten Versuch (exponentielles Backoff)
-        if (attempts < maxAttempts) {
-          const waitTime = Math.pow(2, attempts) * 500; // 1s, 2s, 4s...
-          console.log(`Warte ${waitTime}ms vor dem nächsten Versuch...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-        }
-      }
+    const responseText = await response.text();
+
+    // Prüfen auf leere Antwort oder HTML
+    if (!responseText || responseText.trim() === '' || responseText.includes('<!DOCTYPE') || responseText.includes('<html')) {
+      console.error('API Auth: Ungültige Antwort vom Server (leer oder HTML)');
+      throw new Error('Ungültige Antwort vom Kickbase-Server');
     }
-    
-    // Wenn wir hier ankommen, sind alle Versuche fehlgeschlagen
-    console.error('Alle Login-Versuche fehlgeschlagen');
-    return NextResponse.json(
-      { message: lastError?.message || 'Login fehlgeschlagen nach mehreren Versuchen' },
-      { status: 500 }
-    );
-    
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (error) {
+      console.error('API Auth: Fehler beim Parsen der Antwort als JSON:', error);
+      console.error('API Auth: Antwort-Text:', responseText.substring(0, 500)); // Logge den Text bei Parse-Fehler
+      throw new Error('Antwort von Kickbase konnte nicht verarbeitet werden');
+    }
+
+    // Fehlerprüfung (Statuscode und bekannte Fehlermeldungen)
+    if (!response.ok) {
+      // Prüfen auf bekannte Fehlermeldung "ClientTooOld"
+      if (data.err === 5 && data.errMsg === "ClientTooOld") {
+        console.error('API Auth: Kickbase meldet veralteten Client');
+        return NextResponse.json(
+          { message: 'Login fehlgeschlagen: Veralteter Client (API)' },
+          { status: 400 }
+        );
+      }
+      const errorMessage = data?.message || data?.errMsg || `HTTP-Fehler ${response.status}`;
+      console.error('API Auth: Kickbase API Fehler:', errorMessage);
+      throw new Error(`Login fehlgeschlagen: ${errorMessage}`);
+    }
+
+    // Erfolgsprüfung (Token und Benutzerdaten vorhanden?)
+    if (data.tkn && data.u) {
+      // Extrahiere und transformiere die Ligen (srvl)
+      let transformedLeagues: League[] = [];
+      if (data.srvl && Array.isArray(data.srvl)) {
+        transformedLeagues = data.srvl.map((league: any) => ({
+          id: league.id, // ID ist direkt 'id' in srvl, nicht 'i'
+          name: league.name, // Name ist direkt 'name', nicht 'n'
+          memberCount: league.mu || 0, // Mitgliederzahl ist 'mu' (max users?)
+          // Bild-Logik: Priorisiere 'lim', dann 'ci', dann Fallback
+          image: league.lim ? `https://kickbase.b-cdn.net/${league.lim}`
+                 : league.ci ? league.ci // 'ci' scheint schon eine volle URL zu sein
+                 : undefined, // Oder ein Standard-Placeholder?
+        }));
+      }
+
+      const formattedResponse = {
+        token: data.tkn,
+        user: {
+          id: data.u.id,
+          name: data.u.name,
+          email: data.u.email || email // Verwende die übergebene E-Mail als Fallback
+        },
+        leagues: transformedLeagues // Füge transformierte Ligen hinzu
+      };
+      // console.log('API Auth: Login erfolgreich für Benutzer:', formattedResponse.user.id); // Auskommentiert
+      return NextResponse.json(formattedResponse);
+    } else {
+      console.error('API Auth: Antwort enthält kein Token oder Benutzerdaten', Object.keys(data));
+      throw new Error('Unvollständige Antwort von Kickbase');
+    }
+
   } catch (error: any) {
-    console.error('Login-Fehler:', error);
+    // Fange alle anderen Fehler (Netzwerk, Verarbeitungsfehler etc.)
+    console.error('API Auth: Unerwarteter Fehler im Login-Handler:', error);
     return NextResponse.json(
-      { message: error.message || 'Ein unerwarteter Fehler ist aufgetreten' },
-      { status: 500 }
+      // Gib die spezifische Fehlermeldung zurück, wenn vorhanden
+      { message: error.message || 'Ein unerwarteter Serverfehler ist aufgetreten' },
+      { status: 500 } // Allgemeiner Serverfehler
     );
   }
 }

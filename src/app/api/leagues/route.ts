@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     
     const token = authHeader.split(' ')[1];
     
-    console.log('Leagues-Anfrage mit Token:', token.substring(0, 15) + '...');
+    //console.log('Leagues-Anfrage mit Token:', token.substring(0, 15) + '...');
     
     // Anfrage an die Kickbase-API mit dem Token vom Login
     const response = await fetch('https://api.kickbase.com/v4/leagues/selection', {
@@ -25,13 +25,10 @@ export async function GET(request: Request) {
         'Authorization': `Bearer ${token}` // Das Token vom Login weitergeben
       }
     });
-
-    console.log('Kickbase API response status:', response.status);
-    console.log('Content-Type:', response.headers.get('content-type'));
     
     // Antwort als Text lesen für sichereres Verarbeiten
     const responseText = await response.text();
-    console.log('Antwort-Vorschau:', responseText.substring(0, 200));
+    //console.log('Antwort-Vorschau:', responseText.substring(0, 200));
     
     // Falls wir HTML statt JSON bekommen
     if (responseText.includes('<!DOCTYPE') || responseText.includes('<html')) {
@@ -46,7 +43,7 @@ export async function GET(request: Request) {
     let data;
     try {
       data = JSON.parse(responseText);
-      console.log('Antwort-Datenstruktur:', Object.keys(data));
+      //console.log('Antwort-Datenstruktur:', Object.keys(data));
       
       // Auf "ClientTooOld"-Fehler prüfen
       if (data.err === 5 && data.errMsg === "ClientTooOld") {

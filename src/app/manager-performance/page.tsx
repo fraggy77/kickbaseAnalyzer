@@ -195,7 +195,7 @@ export default function ManagerPerformancePage() {
                     <Legend wrapperStyle={{ fontSize: '14px' }} />
                     <Bar dataKey="mdp" name="Punkte Spieltag" barSize={20}>
                       {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.tw ? '#f59e0b' : '#3b82f6'} />
+                        <Cell key={`cell-${index}`} fill={entry.tw ? '#10b981' : '#3b82f6'} />
                       ))}
                     </Bar>
                     <Line type="monotone" dataKey="ap" name="Durchschnitt" stroke="#10b981" strokeWidth={2} dot={false} strokeDasharray="5 5" />

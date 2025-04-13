@@ -1,41 +1,31 @@
-'use client';
+'use client'; 
+// Übersichtsseite nach Liga-Select mit Buttons für Teams, Tabelle... 
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { kickbaseAPI } from '@/lib/kickbase-api';
-
-interface LeagueDetails {
-  i: string;          // ID
-  lnm: string;        // Liganame
-  cpn: string;        // Competition Name
-  dt: string;         // Datum der Erstellung
-  isr: boolean;       // ?
-  // weitere Eigenschaften
-}
 
 export default function DashboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const leagueId = searchParams.get('league');
   
-  const [leagueDetails, setLeagueDetails] = useState<LeagueDetails | null>(null);
+  const [leagueName, setLeagueName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Überprüfe, ob der Benutzer angemeldet ist
     const checkAuth = () => {
       const storedUser = localStorage.getItem('kickbaseUser');
       if (!storedUser) {
         router.push('/');
         return false;
       }
-      
       try {
-        const { token, email } = JSON.parse(storedUser);
+        const { token, id, email } = JSON.parse(storedUser);
         
-        // Token in der API setzen
         kickbaseAPI.token = token;
+        kickbaseAPI.userId = id;
         kickbaseAPI.email = email;
         return true;
       } catch (error) {
@@ -46,38 +36,39 @@ export default function DashboardPage() {
       }
     };
 
-    // Wenn kein League-Parameter übergeben wurde, zurück zur Liga-Auswahl
-    if (!leagueId) {
-      router.push('/leagues');
-      return;
-    }
+    const loadInitialData = () => {
+      if (!leagueId) {
+        setError('Keine Liga-ID in der URL gefunden.');
+        setIsLoading(false);
+        return;
+      }
+
+      const storedLeague = localStorage.getItem('selectedLeague');
+      if (storedLeague) {
+        try {
+          const selectedLeague = JSON.parse(storedLeague);
+          if (selectedLeague.id === leagueId) {
+            setLeagueName(selectedLeague.name || 'Unbekannte Liga');
+          } else {
+            console.warn('Liga-ID in localStorage stimmt nicht mit URL überein. Lade neu...');
+            setError('Inkonsistenter Ligastatus.');
+          }
+        } catch (e) {
+          console.error("Fehler beim Parsen von selectedLeague:", e);
+          setError('Gespeicherte Liga-Daten sind korrupt.');
+        }
+      } else {
+        setError('Keine ausgewählte Liga gefunden. Bitte wähle eine Liga aus.');
+      }
+      setIsLoading(false);
+    };
 
     if (checkAuth()) {
-      loadLeagueDetails();
-    }
-  }, [leagueId, router]);
-
-  const loadLeagueDetails = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Liga-Details abrufen
-      const details = await kickbaseAPI.getLeagueDetails(leagueId as string);
-      console.log('Liga-Details geladen:', details);
-      setLeagueDetails(details);
-    } catch (error: any) {
-      console.error('Fehler beim Laden der Liga-Details:', error);
-      setError('Die Liga-Details konnten nicht geladen werden. Bitte versuche es später erneut.');
-      
-      // Bei Authentifizierungsfehlern zurück zum Login
-      if (error.message.includes('401') || error.message.includes('Unauthoriz')) {
-        localStorage.removeItem('kickbaseUser');
-        router.push('/');
-      }
-    } finally {
+      loadInitialData();
+    } else {
       setIsLoading(false);
     }
-  };
+  }, [leagueId]);
 
   const handleBack = () => {
     router.push('/leagues');
@@ -86,6 +77,9 @@ export default function DashboardPage() {
   const handleLogout = () => {
     localStorage.removeItem('kickbaseUser');
     localStorage.removeItem('selectedLeague');
+    kickbaseAPI.token = null;
+    kickbaseAPI.userId = null;
+    kickbaseAPI.email = null;
     router.push('/');
   };
 
@@ -141,62 +135,49 @@ export default function DashboardPage() {
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
               <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-                  {leagueDetails?.lnm || 'Liga-Details'}
+                  {leagueName || 'Dashboard'}
                 </h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {leagueDetails?.cpn || 'Wettbewerb'}
-                </p>
               </div>
               
               <div className="px-6 py-5">
-                {leagueDetails && (
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Liga-ID</h3>
-                      <p className="mt-1 text-sm text-gray-900 dark:text-white">{leagueDetails.i}</p>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Erstellt am</h3>
-                      <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                        {new Date(leagueDetails.dt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    
-                    {/* Neue große Reiter für Navigation */}
-                    <div className="pt-8 grid grid-cols-3 gap-4">
-                      <button
-                        onClick={() => router.push(`/team?league=${leagueId}`)}
-                        className="flex flex-col items-center justify-center p-6 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/30 rounded-xl transition-colors shadow-sm hover:shadow"
-                      >
-                        <svg className="h-12 w-12 text-green-600 dark:text-green-400 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        <span className="text-lg font-medium text-green-800 dark:text-green-300">Mein Team</span>
-                      </button>
-
-                      <button
-                        onClick={() => router.push(`/league-table?league=${leagueId}`)}
-                        className="flex flex-col items-center justify-center p-6 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 rounded-xl transition-colors shadow-sm hover:shadow"
-                      >
-                        <svg className="h-12 w-12 text-blue-600 dark:text-blue-400 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                        <span className="text-lg font-medium text-blue-800 dark:text-blue-300">Tabelle</span>
-                      </button>
-
-                      <button
-                        onClick={() => router.push(`/matchday?league=${leagueId}`)}
-                        className="flex flex-col items-center justify-center p-6 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 rounded-xl transition-colors shadow-sm hover:shadow"
-                      >
-                        <svg className="h-12 w-12 text-purple-600 dark:text-purple-400 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <span className="text-lg font-medium text-purple-800 dark:text-purple-300">Spieltage</span>
-                      </button>
-                    </div>
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Liga-ID</h3>
+                    <p className="mt-1 text-sm text-gray-900 dark:text-white">{leagueId}</p>
                   </div>
-                )}
+                  
+                  <div className="pt-8 grid grid-cols-3 gap-4">
+                    <button
+                      onClick={() => router.push(`/team?league=${leagueId}`)}
+                      className="flex flex-col items-center justify-center p-6 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/30 rounded-xl transition-colors shadow-sm hover:shadow"
+                    >
+                      <svg className="h-12 w-12 text-green-600 dark:text-green-400 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      <span className="text-lg font-medium text-green-800 dark:text-green-300">Mein Team</span>
+                    </button>
+
+                    <button
+                      onClick={() => router.push(`/league-table?league=${leagueId}`)}
+                      className="flex flex-col items-center justify-center p-6 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 rounded-xl transition-colors shadow-sm hover:shadow"
+                    >
+                      <svg className="h-12 w-12 text-blue-600 dark:text-blue-400 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      <span className="text-lg font-medium text-blue-800 dark:text-blue-300">Tabelle</span>
+                    </button>
+
+                    <button
+                      onClick={() => router.push(`/matchday?league=${leagueId}`)}
+                      className="flex flex-col items-center justify-center p-6 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 rounded-xl transition-colors shadow-sm hover:shadow"
+                    >
+                      <svg className="h-12 w-12 text-purple-600 dark:text-purple-400 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span className="text-lg font-medium text-purple-800 dark:text-purple-300">Spieltage</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

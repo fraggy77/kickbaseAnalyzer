@@ -1,9 +1,13 @@
+//Das ist die LoginSeite, die man beim Start der App sieht
+//hier gibt man die Kickbase Login Daten ein und wird zu den Ligen weitergeleitet
+
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { kickbaseAPI } from '@/lib/kickbase-api';
+import type { League } from '@/types/league.types'; // Importiere League Typ
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,23 +22,53 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Kickbase Login ausführen
+      // Kickbase Login ausführen - erwartet jetzt { token, user, leagues }
       const userData = await kickbaseAPI.login(email, password);
-      
-      // Token im localStorage speichern
-      localStorage.setItem('kickbaseUser', JSON.stringify({
+
+      // Login-Daten immer speichern
+      const kickbaseUser = {
         token: userData.token,
         id: userData.user.id,
-        email: email
-      }));
+        email: userData.user.email || email // Nutze Fallback
+      };
+      localStorage.setItem('kickbaseUser', JSON.stringify(kickbaseUser));
 
-      // Zur Ligen-Auswahl weiterleiten
-      router.push('/leagues');
+      // Prüfe die Anzahl der Ligen
+      if (userData.leagues && userData.leagues.length === 1) {
+        // --- Fall 1: Nur eine Liga ---
+        const singleLeague = userData.leagues[0];
+        console.log('Nur eine Liga gefunden, leite direkt weiter:', singleLeague.name);
+
+        // Speichere die ausgewählte Liga
+        localStorage.setItem('selectedLeague', JSON.stringify({
+          id: singleLeague.id,
+          name: singleLeague.name
+        }));
+
+        // Navigiere direkt zum Dashboard
+        router.push(`/dashboard?league=${singleLeague.id}`);
+
+      } else {
+        // --- Fall 2: 0 oder mehr als 1 Liga ---
+        console.log(`${userData.leagues?.length || 0} Ligen gefunden, leite zu /leagues weiter.`);
+
+        // Speichere die Ligenliste temporär für die nächste Seite
+        if (userData.leagues) {
+            sessionStorage.setItem('pendingLeagues', JSON.stringify(userData.leagues));
+        } else {
+            sessionStorage.setItem('pendingLeagues', JSON.stringify([])); // Leeres Array speichern, falls keine Ligen
+        }
+
+
+        // Zur Ligen-Auswahl weiterleiten
+        router.push('/leagues');
+      }
+
     } catch (error: any) {
       setError(error.message || 'Anmeldung fehlgeschlagen. Bitte überprüfe deine Zugangsdaten.');
-    } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Ladezustand bei Fehler beenden
     }
+    // setIsLoading wird bei Erfolg nicht auf false gesetzt, da navigiert wird.
   };
 
   return (
