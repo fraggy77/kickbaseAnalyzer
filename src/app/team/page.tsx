@@ -63,7 +63,7 @@ export default function TeamPage() {
 
       // Beide API-Aufrufe parallel starten
       const [squadResponse, meResponse] = await Promise.all([
-        kickbaseAPI.getTeam(leagueId as string), // Ruft jetzt /api/.../squad auf
+        kickbaseAPI.getSquad(leagueId as string), // Ruft jetzt /api/.../squad auf
         kickbaseAPI.getLeagueMe(leagueId as string) // Ruft /api/.../me auf
       ]);
 
@@ -91,8 +91,7 @@ export default function TeamPage() {
           budget: meResponse?.b || 0, // Budget aus /me
           teamValue: calculatedTeamValue, // Berechneter Wert
           name: meResponse?.tn || 'Mein Team', // Teamname aus /me, falls vorhanden
-          points: meResponse?.tp || 0, // Punkte aus /me
-          rank: meResponse?.tr || 0, // Rang aus /me
+         
         });
 
       } else {
@@ -102,9 +101,7 @@ export default function TeamPage() {
         setTeamInfo({
           budget: meResponse?.b || 0,
           teamValue: 0,
-          name: meResponse?.tn || 'Mein Team',
-          points: meResponse?.tp || 0,
-          rank: meResponse?.tr || 0,
+       
         });
       }
 
@@ -175,12 +172,7 @@ export default function TeamPage() {
               {teamInfo && (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
                   <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                    <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-                      {teamInfo.name}
-                    </h2>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      {teamInfo.rank ? `Platz ${teamInfo.rank} • ` : ''}{teamInfo.points || 0} Punkte
-                    </p>
+                   
                   </div>
                   <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>

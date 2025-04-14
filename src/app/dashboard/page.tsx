@@ -13,6 +13,7 @@ export default function DashboardPage() {
   const [leagueName, setLeagueName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [leagueImage, setLeagueImage] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const checkAuth = () => {
@@ -49,6 +50,7 @@ export default function DashboardPage() {
           const selectedLeague = JSON.parse(storedLeague);
           if (selectedLeague.id === leagueId) {
             setLeagueName(selectedLeague.name || 'Unbekannte Liga');
+            setLeagueImage(selectedLeague.image);
           } else {
             console.warn('Liga-ID in localStorage stimmt nicht mit URL überein. Lade neu...');
             setError('Inkonsistenter Ligastatus.');
@@ -134,9 +136,19 @@ export default function DashboardPage() {
           ) : (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
               <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-                  {leagueName || 'Dashboard'}
-                </h2>
+                <div className="flex items-center space-x-3">
+                  {leagueImage && (
+                    <img
+                      src={leagueImage}
+                      alt={`${leagueName} Logo`}
+                      className="h-16 w-16 rounded-md object-cover flex-shrink-0"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  )}
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white truncate">
+                    {leagueName || 'Dashboard'}
+                  </h2>
+                </div>
               </div>
               
               <div className="px-6 py-5">

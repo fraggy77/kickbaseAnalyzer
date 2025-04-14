@@ -1,5 +1,4 @@
-import { NextResponse } from 'next/server';
-import { NextRequest } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 
 // Du kannst die safeApiRequest Funktion hierher kopieren oder besser:
 // Lagere safeApiRequest in eine eigene Datei aus, z.B. src/lib/api-utils.ts
@@ -43,43 +42,53 @@ async function safeApiRequest(url: string, options: RequestInit) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { leagueId: string } }
+  context: { params: Promise<{ leagueId: string }> } // Empfange context, params ist ein Promise
 ) {
   try {
-    const leagueId = params.leagueId;
-    const authHeader = request.headers.get('Authorization');
+    // !!! NEU: Warte auf das params-Promise !!!
+    const params = await context.params;
+    const leagueId = params?.leagueId; // Jetzt sollte der Zugriff funktionieren
 
+    // Prüfen, ob leagueId nach dem await da ist
+    if (!leagueId) {
+        console.error('[API Route /me] Keine leagueId nach await params gefunden!', params);
+        console.log('[API Route /me] Ursprünglicher Context:', context);
+        return NextResponse.json({ message: 'Liga-ID konnte nicht extrahiert werden' }, { status: 400 });
+    }
+
+    const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ message: 'Authorization header fehlt' }, { status: 401 });
     }
     const token = authHeader.split(' ')[1];
-    console.log(`[API Route /me] Anfrage für Liga ${leagueId}`);
+    // console.log(`[API Route /me] Anfrage für Liga ${leagueId}`);
 
-    // Rufe den /me Endpunkt von Kickbase ab
-    const meResult = await safeApiRequest(`https://api.kickbase.com/v4/leagues/${leagueId}/me`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Kickbase/iOS 6.9.0',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${token}`
+    const meResult = await safeApiRequest(
+      `https://api.kickbase.com/v4/leagues/${leagueId}/me`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Kickbase/iOS 6.9.0',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       }
-    });
+    );
 
     if (meResult.error || !meResult.data) {
-      console.error(`[API Route /me] Fehler beim Abrufen der ME-Daten: ${meResult.error}`);
-      return NextResponse.json(
-        { message: `Fehler beim Abrufen der Ligainformationen: ${meResult.error || 'Keine Daten erhalten'}` },
+       return NextResponse.json(
+        { message: `Fehler beim Abrufen der /me Daten: ${meResult.error}` },
         { status: meResult.status || 500 }
       );
     }
 
-    console.log('[API Route /me] ME-Daten erfolgreich abgerufen:', Object.keys(meResult.data));
-    // Gib die ME-Daten direkt zurück
     return NextResponse.json(meResult.data);
 
   } catch (error: any) {
-    console.error('[API Route /me] Unerwarteter Fehler:', error);
+    let resolvedLeagueId = 'unbekannt';
+    try { resolvedLeagueId = (await context.params)?.leagueId || 'nicht im Promise'; } catch {}
+    console.error(`[API Route /me] Unerwarteter Fehler für Liga ${resolvedLeagueId}:`, error);
     return NextResponse.json(
       { message: error.message || 'Ein interner Serverfehler ist aufgetreten' },
       { status: 500 }

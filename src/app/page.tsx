@@ -39,10 +39,11 @@ export default function LoginPage() {
         const singleLeague = userData.leagues[0];
         console.log('Nur eine Liga gefunden, leite direkt weiter:', singleLeague.name);
 
-        // Speichere die ausgewählte Liga
+        // Speichere die ausgewählte Liga MIT Bild
         localStorage.setItem('selectedLeague', JSON.stringify({
           id: singleLeague.id,
-          name: singleLeague.name
+          name: singleLeague.name,
+          image: singleLeague.image // Bild-URL hinzufügen
         }));
 
         // Navigiere direkt zum Dashboard

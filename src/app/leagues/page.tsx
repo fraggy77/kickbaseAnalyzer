@@ -15,7 +15,7 @@ export default function LeaguesPage() {
 
   // Diese Funktion wird aufgerufen, wenn eine Liga ausgewählt wird ODER
   // wenn nur eine Liga vorhanden ist.
-  const handleLeagueSelect = async (leagueId: string, leagueName: string) => {
+  const handleLeagueSelect = async (leagueId: string, leagueName: string, leagueImage: string | undefined) => {
     // Ladezustand nicht mehr ändern, da wir nicht mehr fetchen
     // setIsLoading(true);
     setError('');
@@ -27,7 +27,8 @@ export default function LeaguesPage() {
       // Speichere die ausgewählte Liga-ID und den bereits bekannten Namen
       localStorage.setItem('selectedLeague', JSON.stringify({
         id: leagueId,
-        name: leagueName // Nutze den übergebenen Namen
+        name: leagueName,
+        image: leagueImage
       }));
 
       // Navigiere zum Dashboard
@@ -130,7 +131,7 @@ export default function LeaguesPage() {
                 {leagues.map((league: League) => (
                   <li key={league.id}>
                     <button
-                      onClick={() => handleLeagueSelect(league.id, league.name)}
+                      onClick={() => handleLeagueSelect(league.id, league.name, league.image)}
                       className="w-full px-6 py-5 flex items-center hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-50 dark:focus:bg-gray-700 transition duration-150 ease-in-out"
                     >
                       <div className="min-w-0 flex-1 flex items-center">

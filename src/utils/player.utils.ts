@@ -35,7 +35,7 @@ export const getPositionName = (position: number) => {
     // Normalisiert Spielerdaten für einheitliche Darstellung
    export const normalizePlayer = (player: Player) => {
     // Logge die relevanten Felder aus den Originaldaten
-    console.log(`Normalizing player: ${player.n || player.lastName}, Original ti: ${player.ti}, Original tn: ${player.tn}, Original teamId: ${player.teamId}`);
+    //console.log(`Normalizing player: ${player.n || player.lastName}, Original ti: ${player.ti}, Original tn: ${player.tn}, Original teamId: ${player.teamId}`);
 
     const normalized = {
       id: player.id || player.i || '',
@@ -50,6 +50,6 @@ export const getPositionName = (position: number) => {
       pim: player.pim || (player.originalData && player.originalData.pim) || ''
     };
 
-    console.log(` -> Resulting teamId: ${normalized.teamId}`); // Logge die ermittelte ID
+    //console.log(` -> Resulting teamId: ${normalized.teamId}`); // Logge die ermittelte ID
     return normalized;
   };

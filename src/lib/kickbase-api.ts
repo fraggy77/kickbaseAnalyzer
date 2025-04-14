@@ -212,12 +212,7 @@ class KickbaseAPI {
     }
   }
 
-  /**
-   * Alias für getSquad
-   */
-  async getTeam(leagueId: string): Promise<any> {
-    return this.getSquad(leagueId);
-  }
+
 
   /**
    * Liga-Tabelle abrufen

@@ -1,7 +1,6 @@
 // src/app/api/leagues/[leagueId]/squad/route.ts
 
-import { NextResponse } from 'next/server';
-import { NextRequest } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 
 // Hilfsfunktion für API-Requests mit Retry etc. (kann ausgelagert werden)
 async function safeApiRequest(url: string, options: RequestInit) {
@@ -48,72 +47,82 @@ async function safeApiRequest(url: string, options: RequestInit) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { leagueId: string } }
+  context: { params: Promise<{ leagueId: string }> } // Empfange context, params ist ein Promise
 ) {
   try {
-    const leagueId = params.leagueId;
-    const authHeader = request.headers.get('Authorization');
+    // !!! NEU: Warte auf das params-Promise !!!
+    const params = await context.params;
+    const leagueId = params?.leagueId; // Jetzt sollte der Zugriff funktionieren
 
+    // Prüfen, ob leagueId nach dem await da ist
+    if (!leagueId) {
+        console.error('[API Route /squad] Keine leagueId nach await params gefunden!', params);
+        // Logge auch den ursprünglichen context, falls params leer war
+        console.log('[API Route /squad] Ursprünglicher Context:', context);
+        return NextResponse.json({ message: 'Liga-ID konnte nicht extrahiert werden' }, { status: 400 });
+    }
+
+    const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ message: 'Authorization header fehlt' }, { status: 401 });
     }
     const token = authHeader.split(' ')[1];
-    console.log(`[API Route /squad] Anfrage für Liga ${leagueId}`);
+    // console.log(`[API Route /squad] Anfrage für Liga ${leagueId}`);
 
-    // Nur die Spielerdaten vom Kickbase /squad Endpunkt abrufen
-    const squadResult = await safeApiRequest(`https://api.kickbase.com/v4/leagues/${leagueId}/squad`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Kickbase/iOS 6.9.0', // Oder eine neuere Version
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${token}`
+    const squadResult = await safeApiRequest(
+      `https://api.kickbase.com/v4/leagues/${leagueId}/squad`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Kickbase/iOS 6.9.0', // Oder eine neuere Version
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       }
-    });
+    );
 
     if (squadResult.error || !squadResult.data) {
-      console.error(`[API Route /squad] Fehler beim Abrufen der Squad-Daten: ${squadResult.error}`);
       return NextResponse.json(
         { message: `Fehler beim Abrufen der Spielerdaten: ${squadResult.error || 'Keine Daten erhalten'}` },
         { status: squadResult.status || 500 }
       );
     }
 
+    // !!! NEUER DEBUG-LOG: Was genau kommt von Kickbase zurück? !!!
+    // console.log('[API Route /squad] RAW RESPONSE von Kickbase API:', JSON.stringify(squadResult.data, null, 2)); // Kann jetzt wieder auskommentiert werden
+
     const squadData = squadResult.data;
-    const players = squadData.it || []; // Spieler sind im 'it'-Array
-
-    console.log(`[API Route /squad] ${players.length} Spieler von Kickbase erhalten.`);
-    if (players.length > 0) {
-         console.log('[API Route /squad] Erstes rohes Spielerobjekt:', players[0]);
-         console.log('[API Route /squad] Keys des ersten rohen Spielers:', Object.keys(players[0]));
-    }
-
-
-    // Spielerdaten transformieren
-    const transformedPlayers = players.map((player: any) => {
-       const teamIdToUse = String(player.tid || ''); // Sicherstellen, dass es ein String ist
-        console.log(`[API Route /squad] Mapping player ${player.n}. Using teamId: '${teamIdToUse}' from field 'tid'`);
+    const playersRaw = squadData.it || [];
+    const transformedPlayers = playersRaw.map((player: any) => {
+       const teamIdToUse = String(player.tid || '');
+       // Prüfe ob Vorname 'fn' in den rohen Daten existiert, sonst Fallback
+       const firstName = player.fn || '';
+       // Prüfe ob Nachname 'n' existiert, sonst Fallback
+       const lastName = player.n || '';
       return {
-        id: player.i || '',
-        firstName: player.fn || '',
-        lastName: player.n || player.ln || '',
-        position: player.pos || 0,
-        status: player.st || 0,
-        marketValue: player.mv || 0,
-        points: player.p || 0,
-        teamId: teamIdToUse, // Korrigiert: String verwenden
-        mvgl: player.mvgl || 0,
-        pim: player.pim || '',
-        // originalData: player // Optional für Debugging im Frontend
+        id: player.i || '', // ID ist 'i'
+        firstName: firstName, // Vorname ist oft nicht dabei, aber sicherheitshalber prüfen
+        lastName: lastName, // Nachname ist 'n'
+        position: player.pos || 0, // 'pos'
+        status: player.st || 0, // 'st'
+        marketValue: player.mv || 0, // 'mv'
+        points: player.p || 0, // 'p'
+        teamId: teamIdToUse, // 'tid'
+        mvgl: player.mvgl || 0, // 'mvgl'
+        pim: player.pim || '', // 'pim'
       };
     });
 
-    // Nur die transformierte Spielerliste zurückgeben
-    // Wichtig: Das Frontend (`loadTeamData`) erwartet die Spieler unter dem Key `pl`
-    return NextResponse.json({ pl: transformedPlayers });
+    const responseData = { pl: transformedPlayers };
+    // console.log('[API Route /squad] Sende folgende Datenstruktur zurück:', JSON.stringify(responseData, null, 2)); // Wieder aktivieren zum Testen
+    return NextResponse.json(responseData);
 
   } catch (error: any) {
-    console.error('[API Route /squad] Unerwarteter Fehler:', error);
+    // Versuche, die League ID auch hier zu loggen (könnte fehlschlagen, wenn await fehlschlägt)
+    let resolvedLeagueId = 'unbekannt';
+    try { resolvedLeagueId = (await context.params)?.leagueId || 'nicht im Promise'; } catch {}
+    console.error(`[API Route /squad] Unerwarteter Fehler für Liga ${resolvedLeagueId}:`, error);
     return NextResponse.json(
       { message: error.message || 'Ein interner Serverfehler ist aufgetreten' },
       { status: 500 }
