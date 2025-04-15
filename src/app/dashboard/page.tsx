@@ -180,13 +180,13 @@ export default function DashboardPage() {
                     </button>
 
                     <button
-                      onClick={() => router.push(`/matchday?league=${leagueId}`)}
-                      className="flex flex-col items-center justify-center p-6 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 rounded-xl transition-colors shadow-sm hover:shadow"
+                      onClick={() => router.push(`/market?league=${leagueId}`)}
+                      className="flex flex-col items-center justify-center p-6 bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-900/20 dark:hover:bg-yellow-900/30 rounded-xl transition-colors shadow-sm hover:shadow"
                     >
-                      <svg className="h-12 w-12 text-purple-600 dark:text-purple-400 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      <svg className="h-12 w-12 text-yellow-600 dark:text-yellow-400 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h2.64m-13.78 0h13.78M6 10.5h12M6 6h12m-1.5 1.5h.75a.75.75 0 0 0 0-1.5h-.75a.75.75 0 0 0 0 1.5m-4.5 0h.75a.75.75 0 0 0 0-1.5h-.75a.75.75 0 0 0 0 1.5m-4.5 0h.75a.75.75 0 0 0 0-1.5H6.75a.75.75 0 0 0 0 1.5M3 3h18v18H3V3z" />
                       </svg>
-                      <span className="text-lg font-medium text-purple-800 dark:text-purple-300">Spieltage</span>
+                      <span className="text-lg font-medium text-yellow-800 dark:text-yellow-300">Transfermarkt</span>
                     </button>
                   </div>
                 </div>

@@ -18,6 +18,7 @@ export interface Player { // Füge 'export' hinzu
     mv?: number;
     p?: number;
     ti?: string;
+    tid?: string;
     tn?: string;
     // Weitere Eigenschaften
     originalData?: any;

@@ -23,6 +23,8 @@ export default function ManagerSquadPage() {
   
   const [players, setPlayers] = useState<Player[]>([]);
   const [managerInfo, setManagerInfo] = useState<ManagerInfo | null>(null);
+  const [startingPlayerIds, setStartingPlayerIds] = useState<string[]>([]);
+  const [s11TeamValue, setS11TeamValue] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -35,10 +37,11 @@ export default function ManagerSquadPage() {
       }
       
       try {
-        const { token, email } = JSON.parse(storedUser);
+        const { token, id, email } = JSON.parse(storedUser);
         
         // Token in der API setzen
         kickbaseAPI.token = token;
+        kickbaseAPI.userId = id;
         kickbaseAPI.email = email;
         return true;
       } catch (error) {
@@ -67,11 +70,15 @@ export default function ManagerSquadPage() {
       setIsLoading(true);
       setError('');
 
-      const responseData = await kickbaseAPI.getManagerSquad(leagueId, userId);
+      const [squadResponse, teamcenterResponse] = await Promise.all([
+        kickbaseAPI.getManagerSquad(leagueId, userId),
+        kickbaseAPI.getManagerTeamcenter(leagueId, userId)
+      ]);
 
-      console.log('Manager-Squad Daten geladen:', responseData);
+      console.log('Manager-Squad Daten geladen:', squadResponse);
+      console.log('Manager-Teamcenter Daten geladen:', teamcenterResponse);
 
-      const playersData = responseData?.pl;
+      const playersData = squadResponse?.pl;
       if (playersData && Array.isArray(playersData)) {
         console.log(`${playersData.length} Spieler geladen`);
         if (playersData.length > 0) {
@@ -86,32 +93,55 @@ export default function ManagerSquadPage() {
         console.log('Berechneter Teamwert des Managers:', calculatedTeamValue);
 
         setManagerInfo({
-          name: responseData?.managerName || 'Unbekannter Manager',
+          name: squadResponse?.managerName || 'Unbekannter Manager',
           teamValue: calculatedTeamValue,
-          managerImage: responseData?.managerImage || '',
+          managerImage: squadResponse?.managerImage || '',
         });
+
+        if (teamcenterResponse && Array.isArray(teamcenterResponse.startingPlayerIds)) {
+          setStartingPlayerIds(teamcenterResponse.startingPlayerIds);
+          console.log(`[ManagerSquadPage] Startelf-IDs für ${userId} gesetzt:`, teamcenterResponse.startingPlayerIds);
+        } else {
+          console.warn(`[ManagerSquadPage] Keine Startelf-IDs für ${userId} von API erhalten.`);
+          setStartingPlayerIds([]);
+        }
 
       } else {
         console.warn('Keine Spielerdaten (pl) in der Manager-Squad-Antwort gefunden');
         setPlayers([]);
         setManagerInfo({
-          name: responseData?.managerName || 'Unbekannter Manager',
+          name: squadResponse?.managerName || 'Unbekannter Manager',
           teamValue: 0,
-          managerImage: responseData?.managerImage || '',
+          managerImage: squadResponse?.managerImage || '',
         });
+        setStartingPlayerIds([]);
       }
 
     } catch (error: any) {
-      console.error('Fehler beim Laden der Manager-Squad-Daten:', error);
+      console.error('Fehler beim Laden der Manager-Daten:', error);
       setError(`Der Kader konnte nicht geladen werden: ${error.message}`);
       if (error.message.includes('401') || error.message.includes('Unauthoriz')) {
         localStorage.removeItem('kickbaseUser');
         router.push('/');
       }
+      setPlayers([]);
+      setStartingPlayerIds([]);
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (players.length > 0 && startingPlayerIds.length > 0) {
+      const value = players
+        .filter(player => startingPlayerIds.includes(player.id || player.pid || ''))
+        .reduce((sum, player) => sum + (player.marketValue || player.mv || 0), 0);
+      setS11TeamValue(value);
+      console.log("[ManagerSquadPage] S11-Wert berechnet:", value);
+    } else if (players.length > 0) {
+        setS11TeamValue(0);
+    }
+  }, [players, startingPlayerIds]);
 
   const handleBack = () => {
     router.push(`/league-table?league=${leagueId}`);
@@ -175,9 +205,10 @@ export default function ManagerSquadPage() {
                       <h2 className="text-lg font-medium text-gray-900 dark:text-white">
                         {managerInfo.name}
                       </h2>
-                      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Teamwert: {formatCurrency(managerInfo.teamValue)}
-                      </p>
+                      <div className="mt-1 flex items-baseline space-x-4 text-sm text-gray-500 dark:text-gray-400">
+                        <p>Teamwert: <span className="font-semibold text-blue-600 dark:text-blue-400">{formatCurrency(managerInfo.teamValue)}</span></p>
+                        <p>S11-Wert: <span className="font-semibold text-yellow-600 dark:text-yellow-400">{formatCurrency(s11TeamValue)}</span></p>
+                      </div>
                     </div>
                     <div>
                       <button
@@ -207,21 +238,30 @@ export default function ManagerSquadPage() {
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead className="bg-gray-50 dark:bg-gray-700">
                       <tr>
+                        <th scope="col" className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-10">S11</th>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Spieler</th>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Team</th>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Position</th>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Marktwert</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Profit</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Punkte</th>
+                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Marktwert</th>
+                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Profit</th>
+                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Punkte</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {players.length > 0 ? (
                         players.map((player) => {
                           const normalizedPlayer = normalizePlayer(player);
+                          const isStarting = startingPlayerIds.includes(normalizedPlayer.id);
+                          const teamData = getTeamData(normalizedPlayer.teamId);
+
                           return (
-                            <tr key={normalizedPlayer.id}>
+                            <tr key={normalizedPlayer.id} className={`${isStarting ? 'bg-green-50 dark:bg-green-900/30' : ''}`}>
+                              <td className="px-2 py-4 whitespace-nowrap text-center">
+                                {isStarting && (
+                                  <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 text-xs font-bold">✓</span>
+                                )}
+                              </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center">
                                   {normalizedPlayer.pim && (
@@ -244,40 +284,12 @@ export default function ManagerSquadPage() {
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                {(() => {
-                                  const teamData = getTeamData(normalizedPlayer.teamId);
-                                  if (teamData.logo) {
-                                    return (
-                                      <div className="flex items-center space-x-2">
-                                        <div className="flex-shrink-0 h-8 w-8">
-                                          <img
-                                            src={`https://kickbase.b-cdn.net/${teamData.logo}`}
-                                            alt={teamData.name}
-                                            title={teamData.name}
-                                            className="h-full w-full object-contain"
-                                            onError={(e) => {
-                                              e.currentTarget.style.display = 'none';
-                                              const parentDiv = e.currentTarget.closest('div.flex-shrink-0');
-                                              if (parentDiv && parentDiv.nextSibling && parentDiv.nextSibling.textContent === '') {
-                                                 (parentDiv.nextSibling as HTMLElement).textContent = teamData.name;
-                                              } else if (parentDiv) {
-                                                const nameSpan = document.createElement('span');
-                                                nameSpan.className = 'text-sm text-gray-500 dark:text-gray-400';
-                                                nameSpan.textContent = teamData.name;
-                                                parentDiv.parentElement?.appendChild(nameSpan);
-                                              }
-                                            }}
-                                          />
-                                        </div>
-                                        <span className="text-sm text-gray-500 dark:text-gray-400 truncate" title={teamData.name}>
-                                          {teamData.name}
-                                        </span>
-                                      </div>
-                                    );
-                                  } else {
-                                    return <div className="text-sm text-gray-500 dark:text-gray-400">{teamData.name}</div>;
-                                  }
-                                })()}
+                                <div className="flex items-center space-x-2">
+                                  {teamData.logo && <img src={`https://kickbase.b-cdn.net/${teamData.logo}`} alt={teamData.name} title={teamData.name} className="h-12 w-12 object-contain flex-shrink-0"/>}
+                                  <span className="text-sm font-medium text-gray-900 dark:text-white truncate" title={teamData.name}>
+                                    {teamData.name}
+                                  </span>
+                                </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-500 dark:text-gray-400">{getPositionName(normalizedPlayer.position)}</div>
@@ -293,10 +305,10 @@ export default function ManagerSquadPage() {
                                   {getStatusName(normalizedPlayer.status)}
                                 </span>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-500 dark:text-gray-400">
                                 {formatCurrency(normalizedPlayer.marketValue)}
                               </td>
-                              <td className={`px-6 py-4 whitespace-nowrap text-sm ${
+                              <td className={`px-6 py-4 whitespace-nowrap text-sm text-right ${
                                 normalizedPlayer.mvgl > 0 
                                   ? 'text-green-600 dark:text-green-400' 
                                   : normalizedPlayer.mvgl < 0 
@@ -305,14 +317,14 @@ export default function ManagerSquadPage() {
                               }`}>
                                 {formatCurrency(normalizedPlayer.mvgl)}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-500 dark:text-gray-400">
                                 {normalizedPlayer.points}
                               </td>
                             </tr>
                           );
                         })
                       ) : (
-                        <tr><td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">Keine Spieler gefunden.</td></tr>
+                        <tr><td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">Keine Spieler gefunden.</td></tr>
                       )}
                     </tbody>
                   </table>

@@ -1,6 +1,7 @@
 // src/lib/kickbase-api.ts
 
 import type { League } from '@/types/league.types';
+import type { Player } from '@/types/player.types';
 
 const BASE_URL = 'https://api.kickbase.com/v4';
 
@@ -21,6 +22,19 @@ interface LoginResponseData {
     email?: string;
   };
   leagues: League[];
+}
+
+interface MarketPlayer extends Player {
+    price: number;
+    expiryDate: string;
+    exs: number;
+    mvt?: number;
+    ap?: number;
+    seller?: { id: string; name: string; profileImage?: string; } | null;
+}
+
+interface MarketResponse {
+    marketPlayers: MarketPlayer[];
 }
 
 class KickbaseAPI {
@@ -114,6 +128,8 @@ class KickbaseAPI {
       throw new Error(`Fehler beim Verarbeiten der Daten für ${apiPath}`);
     }
   }
+  
+  
 
   /**
    * Liga-Details abrufen
@@ -212,8 +228,6 @@ class KickbaseAPI {
     }
   }
 
-
-
   /**
    * Liga-Tabelle abrufen
    */
@@ -240,6 +254,47 @@ class KickbaseAPI {
     } catch (error) {
       console.error(`Kickbase API Fehler (getLeagueRanking ${leagueId}):`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Ruft die Startelf-IDs eines Managers ab.
+   */
+  async getManagerTeamcenter(leagueId: string, userId: string): Promise<{ startingPlayerIds: string[] }> {
+    try {
+      // console.log(`Frontend: Teamcenter Anfrage für Liga ${leagueId}, User ${userId}`); // Optional
+      // *** KORREKTER PFAD HIER: /managers/ statt /users/ ***
+      const data = await this._fetchInternal(`/api/leagues/${leagueId}/managers/${userId}/teamcenter`);
+      // Erwarte ein Objekt { startingPlayerIds: [...] } zurück
+      if (!data || !Array.isArray(data.startingPlayerIds)) {
+          console.warn("Unerwartete Antwort von /api/.../managers/.../teamcenter:", data);
+          return { startingPlayerIds: [] }; // Leeres Array als Fallback
+      }
+      return data;
+    } catch (error) {
+      console.error(`Kickbase API Fehler (getManagerTeamcenter ${leagueId}/${userId}):`, error);
+      // Gib bei Fehler ein leeres Array zurück, damit das Frontend nicht crasht
+      return { startingPlayerIds: [] };
+    }
+  }
+
+  /**
+   * Ruft die Transfermarkt-Daten für eine Liga ab.
+   */
+  async getMarket(leagueId: string): Promise<MarketResponse> {
+    try {
+      // console.log(`Frontend: Market Anfrage für Liga ${leagueId}`); // Optional
+      const data = await this._fetchInternal(`/api/leagues/${leagueId}/market`);
+
+      // Erwarte ein Objekt { marketPlayers: [...] }
+      if (!data || !Array.isArray(data.marketPlayers)) {
+          console.warn("Unerwartete Antwort von /api/leagues/.../market:", data);
+          return { marketPlayers: [] }; // Leeres Array als Fallback
+      }
+      return data;
+    } catch (error) {
+      console.error(`Kickbase API Fehler (getMarket ${leagueId}):`, error);
+      return { marketPlayers: [] }; // Leeres Array bei Fehler
     }
   }
 }

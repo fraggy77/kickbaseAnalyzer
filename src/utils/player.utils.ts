@@ -14,10 +14,10 @@ export const getPositionName = (position: number) => {
   export const getStatusName = (status: number) => { // TODO  STRICKEN UND REHAB ADDEN
     switch (status) {
       case 0: return 'Fit';
-      case 1: return 'Fit';
+      case 1: return 'Gesperrt';
       case 2: return 'Angeschlagen';
-      case 3: return 'Fraglich';
-      default: return 'Fit';
+      case 3: return 'Verletzt';
+      default: return 'Gesperrt';
     }
   };
 
@@ -41,7 +41,7 @@ export const getPositionName = (position: number) => {
       id: player.id || player.i || '',
       firstName: player.firstName || player.fn || '',
       lastName: player.lastName || player.n || player.ln || '',
-      teamId: String(player.teamId || player.ti || ''),
+      teamId: String(player.teamId || player.tid || player.ti || ''),
       position: player.position || player.pos || 0,
       status: player.status || player.st || 0,
       marketValue: player.marketValue || player.mv || 0,

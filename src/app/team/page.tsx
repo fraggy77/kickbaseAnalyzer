@@ -1,15 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { kickbaseAPI } from '@/lib/kickbase-api';
 import { formatCurrency } from '@/utils/formatting.utils';
-import { getPositionName } from '@/utils/player.utils';
-import { getStatusName, getTeamData } from '@/utils/player.utils';
-import { normalizePlayer } from '@/utils/player.utils';
+import { getPositionName, getStatusName, getTeamData, normalizePlayer } from '@/utils/player.utils';
 import { Player } from '@/types/player.types';
-
-
 
 export default function TeamPage() {
   const router = useRouter();
@@ -18,23 +14,22 @@ export default function TeamPage() {
   
   const [players, setPlayers] = useState<Player[]>([]);
   const [teamInfo, setTeamInfo] = useState<any>(null);
+  const [startingPlayerIds, setStartingPlayerIds] = useState<string[]>([]);
+  const [s11TeamValue, setS11TeamValue] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Überprüfe, ob der Benutzer angemeldet ist
     const checkAuth = () => {
       const storedUser = localStorage.getItem('kickbaseUser');
       if (!storedUser) {
         router.push('/');
         return false;
       }
-      
       try {
-        const { token, email } = JSON.parse(storedUser);
-        
-        // Token in der API setzen
+        const { token, id, email } = JSON.parse(storedUser);
         kickbaseAPI.token = token;
+        kickbaseAPI.userId = id;
         kickbaseAPI.email = email;
         return true;
       } catch (error) {
@@ -45,7 +40,6 @@ export default function TeamPage() {
       }
     };
 
-    // Wenn kein League-Parameter übergeben wurde, zurück zur Liga-Auswahl
     if (!leagueId) {
       router.push('/leagues');
       return;
@@ -59,18 +53,18 @@ export default function TeamPage() {
   const loadTeamData = async () => {
     try {
       setIsLoading(true);
-      setError(''); // Fehler zurücksetzen
+      setError('');
 
-      // Beide API-Aufrufe parallel starten
-      const [squadResponse, meResponse] = await Promise.all([
-        kickbaseAPI.getSquad(leagueId as string), // Ruft jetzt /api/.../squad auf
-        kickbaseAPI.getLeagueMe(leagueId as string) // Ruft /api/.../me auf
+      const [squadResponse, meResponse, teamcenterResponse] = await Promise.all([
+        kickbaseAPI.getSquad(leagueId),
+        kickbaseAPI.getLeagueMe(leagueId),
+        kickbaseAPI.getManagerTeamcenter(leagueId, kickbaseAPI.userId)
       ]);
 
       console.log('Squad-Daten geladen:', squadResponse);
       console.log('/me-Daten geladen:', meResponse);
+      console.log('Teamcenter-Daten geladen:', teamcenterResponse);
 
-      // Spieler aus squadResponse extrahieren
       const playersData = squadResponse?.pl;
       if (playersData && Array.isArray(playersData)) {
         console.log(`${playersData.length} Spieler geladen`);
@@ -79,30 +73,32 @@ export default function TeamPage() {
         }
         setPlayers(playersData);
 
-        // Marktwerte aus Spielerdaten berechnen
         const calculatedTeamValue = playersData.reduce((sum, player) => {
           const playerValue = player.marketValue || player.mv || 0;
           return sum + playerValue;
         }, 0);
         console.log('Berechneter Teamwert:', calculatedTeamValue);
 
-        // Team-Infos aus meResponse und berechnetem Wert setzen
         setTeamInfo({
-          budget: meResponse?.b || 0, // Budget aus /me
-          teamValue: calculatedTeamValue, // Berechneter Wert
-          name: meResponse?.tn || 'Mein Team', // Teamname aus /me, falls vorhanden
-         
+          budget: meResponse?.b || 0,
+          teamValue: calculatedTeamValue,
+          name: meResponse?.tn || 'Mein Team',
         });
-
       } else {
         console.warn('Keine Spielerdaten (pl) in der Squad-Antwort gefunden');
         setPlayers([]);
-        // TeamInfo trotzdem mit Daten aus /me setzen (ohne berechneten Teamwert)
         setTeamInfo({
           budget: meResponse?.b || 0,
           teamValue: 0,
-       
         });
+      }
+
+      if (teamcenterResponse && Array.isArray(teamcenterResponse.startingPlayerIds)) {
+        setStartingPlayerIds(teamcenterResponse.startingPlayerIds);
+        console.log("Startelf-IDs gesetzt:", teamcenterResponse.startingPlayerIds);
+      } else {
+        console.warn("Keine Startelf-IDs von API erhalten.");
+        setStartingPlayerIds([]);
       }
 
     } catch (error: any) {
@@ -117,21 +113,27 @@ export default function TeamPage() {
     }
   };
 
+  useEffect(() => {
+    if (players.length > 0 && startingPlayerIds.length > 0) {
+      const value = players
+        .filter(player => startingPlayerIds.includes(player.id || player.pid || ''))
+        .reduce((sum, player) => sum + (player.marketValue || player.mv || 0), 0);
+      setS11TeamValue(value);
+      console.log("[TeamPage] S11-Wert berechnet:", value);
+    } else if (players.length > 0) {
+        setS11TeamValue(0);
+    }
+  }, [players, startingPlayerIds]);
+
   const handleBack = () => {
     router.push(`/dashboard?league=${leagueId}`);
   };
-
-
-
-
- 
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950 dark:to-blue-950">
       <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Mein Team</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">{teamInfo?.name || 'Mein Team'}</h1>
           <button
             onClick={handleBack}
             className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
@@ -168,13 +170,11 @@ export default function TeamPage() {
             </div>
           ) : (
             <>
-              {/* Team-Übersicht */}
               {teamInfo && (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
                   <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                   
                   </div>
-                  <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Budget</h3>
                       <p className="mt-1 text-lg font-semibold text-green-600 dark:text-green-400">
@@ -187,11 +187,16 @@ export default function TeamPage() {
                         {formatCurrency(teamInfo.teamValue)}
                       </p>
                     </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">S11-Wert</h3>
+                      <p className="mt-1 text-lg font-semibold text-yellow-600 dark:text-yellow-400">
+                        {formatCurrency(s11TeamValue)}
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Spielerliste */}
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
                 <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
                   <h2 className="text-lg font-medium text-gray-900 dark:text-white">Spieler</h2>
@@ -204,35 +209,30 @@ export default function TeamPage() {
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead className="bg-gray-50 dark:bg-gray-700">
                       <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Spieler
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Team
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Position
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Marktwert
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Profit
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Punkte
-                        </th>
+                        <th scope="col" className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-10">S11</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Spieler</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Team</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Position</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Marktwert</th>
+                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Profit</th>
+                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Punkte</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {players.length > 0 ? (
                         players.map((player) => {
                           const normalizedPlayer = normalizePlayer(player);
+                          const isStarting = startingPlayerIds.includes(normalizedPlayer.id);
+                          const teamData = getTeamData(normalizedPlayer.teamId);
+
                           return (
-                            <tr key={normalizedPlayer.id}>
+                            <tr key={normalizedPlayer.id} className={`${isStarting ? 'bg-green-50 dark:bg-green-900/30' : ''}`}>
+                              <td className="px-2 py-4 whitespace-nowrap text-center">
+                                {isStarting && (
+                                  <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 text-xs font-bold">✓</span>
+                                )}
+                              </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center">
                                   {normalizedPlayer.pim && (
@@ -255,50 +255,15 @@ export default function TeamPage() {
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                {/* Hole die Teamdaten */}
-                                {(() => {
-                                  const teamData = getTeamData(normalizedPlayer.teamId);
-                                  if (teamData.logo) {
-                                    // Wenn ein Logo vorhanden ist, zeige Logo UND Namen an
-                                    return (
-                                      // Verwende Flexbox, um Logo und Namen nebeneinander zu platzieren
-                                      <div className="flex items-center space-x-2"> {/* space-x-2 für Abstand */}
-                                        <div className="flex-shrink-0 h-8 w-8"> {/* Container für das Bild */}
-                                          <img
-                                            src={`https://kickbase.b-cdn.net/${teamData.logo}`}
-                                            alt={teamData.name}
-                                            title={teamData.name}
-                                            className="h-full w-full object-contain" // Füllt den Container, behält Seitenverhältnis
-                                            onError={(e) => {
-                                              e.currentTarget.style.display = 'none';
-                                              // Optional: Nur Namen anzeigen, wenn Bild fehlt
-                                              const parentDiv = e.currentTarget.closest('div.flex-shrink-0');
-                                              if (parentDiv && parentDiv.nextSibling && parentDiv.nextSibling.textContent === '') {
-                                                 (parentDiv.nextSibling as HTMLElement).textContent = teamData.name;
-                                              } else if (parentDiv) {
-                                                // Wenn der Text-Span noch nicht existiert
-                                                 const nameSpan = document.createElement('span');
-                                                 nameSpan.className = 'text-sm text-gray-500 dark:text-gray-400';
-                                                 nameSpan.textContent = teamData.name;
-                                                 parentDiv.parentElement?.appendChild(nameSpan);
-                                              }
-                                            }}
-                                          />
-                                        </div>
-                                        {/* Span für den Teamnamen neben dem Logo */}
-                                        <span className="text-sm text-gray-500 dark:text-gray-400 truncate" title={teamData.name}>
-                                          {teamData.name}
-                                        </span>
-                                      </div>
-                                    );
-                                  } else {
-                                    // Fallback, wenn kein Logo im Mapping ist, zeige nur den Namen
-                                    return <div className="text-sm text-gray-500 dark:text-gray-400">{teamData.name}</div>;
-                                  }
-                                })()}
+                                <div className="flex items-center space-x-2">
+                                  {teamData.logo && <img src={`https://kickbase.b-cdn.net/${teamData.logo}`} alt={teamData.name} title={teamData.name} className="h-12 w-12 object-contain flex-shrink-0"/>}
+                                  <span className="text-sm font-medium text-gray-900 dark:text-white truncate" title={teamData.name}>
+                                    {teamData.name}
+                                  </span>
+                                </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-500 dark:text-gray-400">{getPositionName(normalizedPlayer.position)}</div>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                {getPositionName(normalizedPlayer.position)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -311,10 +276,10 @@ export default function TeamPage() {
                                   {getStatusName(normalizedPlayer.status)}
                                 </span>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-500 dark:text-gray-400">
                                 {formatCurrency(normalizedPlayer.marketValue)}
                               </td>
-                              <td className={`px-6 py-4 whitespace-nowrap text-sm ${
+                              <td className={`px-6 py-4 whitespace-nowrap text-sm text-right ${
                                 normalizedPlayer.mvgl > 0 
                                   ? 'text-green-600 dark:text-green-400' 
                                   : normalizedPlayer.mvgl < 0 
@@ -323,7 +288,7 @@ export default function TeamPage() {
                               }`}>
                                 {formatCurrency(normalizedPlayer.mvgl)}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-500 dark:text-gray-400">
                                 {normalizedPlayer.points}
                               </td>
                             </tr>

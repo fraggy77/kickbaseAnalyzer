@@ -1,6 +1,6 @@
 // src/utils/teamMapping.ts (Empfohlener Ort)
 
-interface TeamMapEntry {
+export interface TeamMapEntry {
   name: string;
   logo: string; // Path to the logo (SVG oder PNG)
 }
