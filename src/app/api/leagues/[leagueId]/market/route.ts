@@ -39,6 +39,7 @@ interface MarketPlayer extends Player {
     onMarketSince?: string; // Optional: Könnte nützlich sein, wenn das Feld existiert
 }
 
+// --- TEMPORARY PERFORMANCE TEST FUNCTION REMOVED ---
 
 export async function GET(
   request: NextRequest,
@@ -58,7 +59,8 @@ export async function GET(
       return NextResponse.json({ message: 'Authorization header fehlt' }, { status: 401 });
     }
     const token = authHeader.split(' ')[1];
-    // console.log(`[API Route Market] Anfrage für Liga ${leagueId}`);
+
+    // --- TEMPORARY CALL REMOVED ---
 
     // Rufe Kickbase Market API auf
     const marketResult = await safeApiRequest(

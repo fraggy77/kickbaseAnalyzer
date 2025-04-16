@@ -37,6 +37,51 @@ interface MarketResponse {
     marketPlayers: MarketPlayer[];
 }
 
+// Define the type for the competition table API response item
+interface BundesligaTeam {
+  tid: string;
+  tn: string;
+  cpl: number;
+  sp: number;
+  tim: string;
+  // Add other fields if needed by the frontend later
+}
+
+// --- Team Profile Types ---
+interface TeamProfilePlayer {
+  i: string;      // Player ID
+  n: string;      // Player Last Name
+  lst?: number;    // Liga Status?
+  st?: number;     // Status (Fit, Injured, etc.)
+  pos?: number;    // Position
+  mv?: number;     // Market Value
+  mvt?: number;    // Market Value Trend
+  ap?: number;     // Average Points
+  iotm?: boolean;  // In official Transfer Market?
+  ofc?: number;
+  tid?: string;    // Team ID
+  sdmvt?: number;  // Seven Day Market Value Trend?
+  mvgl?: number;   // Market Value Gain/Loss (overall?)
+  pim?: string;    // Player Image path
+}
+
+interface TeamProfileResponse {
+  tid: string;         // Team ID
+  tn: string;          // Team Name
+  pl: number;          // Placement (Bundesliga Rank?)
+  tv: number;          // Team Value
+  tw: number;          // Team Wins
+  td: number;          // Team Draws
+  tl: number;          // Team Losses
+  it: TeamProfilePlayer[]; // Array of Players
+  npt: number;         // Number of Players Total?
+  avpcl: boolean;
+  tim: string;         // Team Image path
+  pclpurl?: string;     // Placeholder Logo?
+  plpurl?: string;      // Placeholder Logo?
+}
+// --- End Team Profile Types ---
+
 class KickbaseAPI {
   token: string | null = null;
   userId: string | null = null;
@@ -295,6 +340,48 @@ class KickbaseAPI {
     } catch (error) {
       console.error(`Kickbase API Fehler (getMarket ${leagueId}):`, error);
       return { marketPlayers: [] }; // Leeres Array bei Fehler
+    }
+  }
+
+  /**
+   * Ruft die Tabelle einer Competition (z.B. Bundesliga) ab.
+   * Calls the internal API route using the authenticated fetch helper.
+   */
+  async getCompetitionTable(competitionId: string): Promise<BundesligaTeam[]> {
+    try {
+      // Use _fetchInternal to automatically send auth token to our internal route
+      const data = await this._fetchInternal(`/api/competitions/${competitionId}/table`);
+      
+      // Validation happens within _fetchInternal and the API route
+      if (!Array.isArray(data)) {
+          console.error("Unerwartete Antwort von /api/competitions/.../table, Array erwartet:", data);
+          throw new Error("Ungültiges Datenformat für Competition-Tabelle erhalten");
+      }
+      return data;
+    } catch (error) {
+      console.error(`Kickbase API Fehler (getCompetitionTable ${competitionId}):`, error);
+      throw error; // Re-throw
+    }
+  }
+
+  /**
+   * Ruft das Profil eines Bundesliga-Teams ab.
+   * Calls the internal API route using the authenticated fetch helper.
+   */
+  async getTeamProfile(competitionId: string, teamId: string): Promise<TeamProfileResponse> {
+    try {
+      // console.log(`Frontend: Team Profile Anfrage für Comp ${competitionId}, Team ${teamId}`);
+      const data = await this._fetchInternal(`/api/competitions/${competitionId}/teams/${teamId}/profile`);
+      
+      // Basic validation (more specific checks could be added)
+      if (!data || typeof data !== 'object' || !Array.isArray(data.it)) {
+          console.error("Unerwartete Antwort von /api/competitions/.../teams/.../profile:", data);
+          throw new Error("Ungültiges Datenformat für Team-Profil erhalten");
+      }
+      return data as TeamProfileResponse; // Cast to the specific type
+    } catch (error) {
+      console.error(`Kickbase API Fehler (getTeamProfile ${competitionId}/${teamId}):`, error);
+      throw error; // Re-throw
     }
   }
 }

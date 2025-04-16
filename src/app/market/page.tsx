@@ -206,7 +206,7 @@ export default function MarketPage() {
                                                 {/* Team */}
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <div className="flex items-center space-x-2">
-                                                         {teamData.logo && <img src={`https://kickbase.b-cdn.net/${teamData.logo}`} alt={teamData.name} className="h-12 w-12 object-contain flex-shrink-0"/>}
+                                                         {teamData.logo && <img src={`https://kickbase.b-cdn.net/${teamData.logo}`} alt={teamData.name} className="h-24 w-24 object-contain flex-shrink-0"/>}
                                                          <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{teamData.name}</span>
                                                     </div>
                                                 </td>

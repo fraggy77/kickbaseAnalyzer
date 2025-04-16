@@ -158,7 +158,7 @@ export default function DashboardPage() {
                     <p className="mt-1 text-sm text-gray-900 dark:text-white">{leagueId}</p>
                   </div>
                   
-                  <div className="pt-8 grid grid-cols-3 gap-4">
+                  <div className="pt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
                     <button
                       onClick={() => router.push(`/team?league=${leagueId}`)}
                       className="flex flex-col items-center justify-center p-6 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/30 rounded-xl transition-colors shadow-sm hover:shadow"
@@ -187,6 +187,17 @@ export default function DashboardPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h2.64m-13.78 0h13.78M6 10.5h12M6 6h12m-1.5 1.5h.75a.75.75 0 0 0 0-1.5h-.75a.75.75 0 0 0 0 1.5m-4.5 0h.75a.75.75 0 0 0 0-1.5h-.75a.75.75 0 0 0 0 1.5m-4.5 0h.75a.75.75 0 0 0 0-1.5H6.75a.75.75 0 0 0 0 1.5M3 3h18v18H3V3z" />
                       </svg>
                       <span className="text-lg font-medium text-yellow-800 dark:text-yellow-300">Transfermarkt</span>
+                    </button>
+
+                    <button
+                      onClick={() => router.push(`/buli`)}
+                      className="flex flex-col items-center justify-center p-6 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 rounded-xl transition-colors shadow-sm hover:shadow"
+                    >
+                      <svg className="h-12 w-12 text-purple-600 dark:text-purple-400 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-6.75c-.622 0-1.125.504-1.125 1.125V18.75m9 0h-9" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 21.75H14.25M12 14.25v7.5M12 14.25a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+                      </svg>
+                      <span className="text-lg font-medium text-purple-800 dark:text-purple-300">Buli Tabelle</span>
                     </button>
                   </div>
                 </div>
