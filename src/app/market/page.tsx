@@ -49,6 +49,7 @@ export default function MarketPage() {
   const [marketPlayers, setMarketPlayers] = useState<MarketPlayer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [leagueImage, setLeagueImage] = useState<string | null>(null); // State for league image
 
   useEffect(() => {
     const checkAuth = () => {
@@ -71,6 +72,21 @@ export default function MarketPage() {
         return false;
       }
     };
+
+    // Get league image from localStorage
+    if (leagueId) {
+        const storedLeague = localStorage.getItem('selectedLeague');
+        if (storedLeague) {
+            try {
+                const selectedLeague = JSON.parse(storedLeague);
+                if (selectedLeague.id === leagueId) {
+                    setLeagueImage(selectedLeague.image);
+                }
+            } catch (e) {
+                console.error("Error parsing selectedLeague for header:", e);
+            }
+        }
+    }
 
     const loadMarketData = async () => {
       // Setze Loading erst hier, kurz bevor der eigentliche Ladevorgang beginnt
@@ -128,7 +144,23 @@ export default function MarketPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-100 to-blue-100 dark:from-gray-900 dark:to-blue-950">
       <header className="bg-white dark:bg-gray-800 shadow">
          <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">Transfermarkt</h1>
+             {/* Left side: League Logo (clickable) + Page Title */}
+            <div className="flex items-center space-x-3">
+                {leagueId && leagueImage && (
+                    <button onClick={() => router.push(`/dashboard?league=${leagueId}`)} title="Zum Liga-Dashboard">
+                        <img 
+                            src={leagueImage} 
+                            alt="Liga Logo" 
+                            className="h-10 w-10 rounded-md object-cover hover:opacity-80 transition-opacity"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                        />
+                    </button>
+                )}
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
+                    Transfermarkt
+                </h1>
+            </div>
+            {/* Right side: Back Button */}
             <button onClick={handleBack} className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
                 Zurück
             </button>
@@ -185,30 +217,60 @@ export default function MarketPage() {
                                             trendColor = 'text-red-600 dark:text-red-400';
                                         }
 
+                                        // Prepare query params for player page
+                                        const queryParams = new URLSearchParams({
+                                            id: player.id || '',
+                                            firstName: player.firstName || '',
+                                            lastName: player.lastName || '',
+                                            teamId: player.teamId || '',
+                                            leagueId: leagueId || '',
+                                            position: (player.position ?? 0).toString(),
+                                            status: (player.status ?? 0).toString(),
+                                            marketValue: (player.marketValue ?? 0).toString(),
+                                            points: (player.points ?? '-').toString(),
+                                            avgPoints: (player.ap ?? '-').toString(), // Use 'ap' from market data
+                                            playerImage: player.pim || '', // Use 'pim' from market data
+                                            mvt: (player.mvt ?? -1).toString(), // Use 'mvt' from market data
+                                        });
+
                                         return (
+                                            // Removed onClick and hover classes from tr
                                             <tr key={player.id}>
-                                                {/* Spieler */}
+                                                {/* Spieler -> Clickable Link to Player Page */}
                                                 <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="flex items-center">
+                                                    <button 
+                                                      onClick={() => router.push(`/player?${queryParams.toString()}`)}
+                                                      className="flex items-center group text-left w-full hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1 rounded transition-colors"
+                                                      title={`${player.firstName || ''} ${player.lastName || ''} Details`}
+                                                    >
                                                          <div className="flex-shrink-0 h-10 w-10 mr-3">
                                                              <img
                                                                className="h-10 w-10 rounded-full object-cover"
                                                                src={playerImageUrl}
                                                                alt={player.lastName}
-                                                               onError={(e) => { e.currentTarget.src = '/placeholder.png'; }}
+                                                               onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/placeholder.png'; }}
                                                               />
                                                          </div>
                                                          <div>
-                                                             <div className="text-sm font-medium text-gray-900 dark:text-white">{player.firstName} {player.lastName}</div>
+                                                             <div className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                                                                 {player.firstName} {player.lastName}
+                                                            </div>
                                                          </div>
-                                                     </div>
+                                                     </button>
                                                 </td>
-                                                {/* Team */}
+                                                {/* Team -> Clickable Link to Team Profile */}
                                                 <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="flex items-center space-x-2">
-                                                         {teamData.logo && <img src={`https://kickbase.b-cdn.net/${teamData.logo}`} alt={teamData.name} className="h-24 w-24 object-contain flex-shrink-0"/>}
-                                                         <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{teamData.name}</span>
-                                                    </div>
+                                                    <button 
+                                                        onClick={() => router.push(`/team-profile?teamId=${player.teamId}`)}
+                                                        className="flex items-center space-x-2 group text-left w-full hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1 rounded transition-colors"
+                                                        title={`${teamData.name} Team Profil`}
+                                                        disabled={!player.teamId} // Disable if no teamId
+                                                     >
+                                                         {teamData.logo && <img src={`https://kickbase.b-cdn.net/${teamData.logo}`} alt={teamData.name} className="h-12 w-12 object-contain flex-shrink-0"/>}
+                                                         <span className="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                                                             {teamData.name}
+                                                        </span>
+                                                     </button>
                                                 </td>
                                                 {/* Position */}
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{getPositionName(player.position ?? 0)}</td>
@@ -222,13 +284,18 @@ export default function MarketPage() {
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-right text-gray-500 dark:text-gray-400">{player.ap ?? '-'}</td>
                                                 {/* Ablauf */}
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatRemainingSeconds(player.exs)}</td>
-                                                {/* Verkäufer */}
+                                                {/* Verkäufer -> Clickable Link to Manager Squad (if not Kickbase) */}
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                                     {player.seller ? (
-                                                        <div className="flex items-center space-x-2">
-                                                            {player.seller.profileImage && <img src={player.seller.profileImage.startsWith('http') ? player.seller.profileImage : `https://kickbase.b-cdn.net/${player.seller.profileImage}`} alt={player.seller.name} className="h-5 w-5 rounded-full"/>}
-                                                            <span>{player.seller.name}</span>
-                                                        </div>
+                                                        <button 
+                                                          onClick={() => router.push(`/manager-squad?league=${leagueId}&user=${player.seller?.id}`)}
+                                                          className="flex items-center space-x-2 group text-left w-full hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1 rounded transition-colors"
+                                                          title={`${player.seller.name} Kader`}
+                                                          disabled={!leagueId || !player.seller.id}
+                                                        >
+                                                            {player.seller.profileImage && <img src={player.seller.profileImage.startsWith('http') ? player.seller.profileImage : `https://kickbase.b-cdn.net/${player.seller.profileImage}`} alt={player.seller.name} className="h-5 w-5 rounded-full flex-shrink-0"/>}
+                                                            <span className="group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{player.seller.name}</span>
+                                                        </button>
                                                     ) : (
                                                         <span className="italic">Kickbase</span>
                                                     )}

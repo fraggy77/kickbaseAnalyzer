@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { kickbaseAPI } from '@/lib/kickbase-api';
 
 // Define the type for the table items - can be removed if kickbase-api exports it, but keep for now
@@ -14,14 +14,30 @@ interface BundesligaTeam {
 }
 
 const CDN_BASE_URL = 'https://kickbase.b-cdn.net/';
+const KICKBASE_COMPETITION_TABLE_URL = 'https://api.kickbase.com/v4/competitions/1/table';
 
 export default function BuliTablePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [teams, setTeams] = useState<BundesligaTeam[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
+  const [selectedLeagueImage, setSelectedLeagueImage] = useState<string | null>(null);
 
   useEffect(() => {
+    // Get selected league info from localStorage for the header link
+    const storedLeague = localStorage.getItem('selectedLeague');
+    if (storedLeague) {
+        try {
+            const league = JSON.parse(storedLeague);
+            setSelectedLeagueId(league.id);
+            setSelectedLeagueImage(league.image);
+        } catch (e) {
+            console.error("Error parsing selectedLeague for Buli header:", e);
+        }
+    }
+
     const loadTable = async () => {
       setIsLoading(true);
       setError('');
@@ -86,7 +102,21 @@ export default function BuliTablePage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-950 dark:to-indigo-950">
       <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Bundesliga Tabelle</h1>
+          <div className="flex items-center space-x-3">
+            {selectedLeagueId && selectedLeagueImage && (
+              <button onClick={() => router.push(`/dashboard?league=${selectedLeagueId}`)} title="Zum Liga-Dashboard">
+                <img 
+                  src={selectedLeagueImage} 
+                  alt="Liga Logo" 
+                  className="h-10 w-10 rounded-md object-cover hover:opacity-80 transition-opacity"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
+              </button>
+            )}
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
+              Bundesliga Tabelle
+            </h1>
+          </div>
           <button onClick={handleBack} className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
             Zurück
           </button>
@@ -133,7 +163,7 @@ export default function BuliTablePage() {
                             <div className="flex items-center">
                               <div className="flex-shrink-0 h-10 w-10 mr-3">
                                 <img
-                                  className="h-10 w-10 object-contain"
+                                  className="h-12 w-12 object-contain"
                                   src={`${CDN_BASE_URL}${team.tim}`}
                                   alt={team.tn}
                                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
@@ -164,4 +194,14 @@ export default function BuliTablePage() {
       </main>
     </div>
   );
-} 
+}
+
+// Wrap with Suspense for useSearchParams if needed
+// If BuliTablePage already uses Suspense, this might not be necessary
+// export default function BuliTablePageSuspenseWrapper() {
+//     return (
+//         <Suspense fallback={<div>Loading...</div>}> 
+//             <BuliTablePage />
+//         </Suspense>
+//     );
+// } 

@@ -45,6 +45,9 @@ export default function LeagueTablePage() {
   const [ranking, setRanking] = useState<RankingData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [leagueName, setLeagueName] = useState<string>('');
+  const [leagueImage, setLeagueImage] = useState<string | null>(null);
 
   useEffect(() => {
     // Überprüfe, ob der Benutzer angemeldet ist
@@ -56,11 +59,13 @@ export default function LeagueTablePage() {
       }
       
       try {
-        const { token, email } = JSON.parse(storedUser);
+        const { token, id, email } = JSON.parse(storedUser);
         
         // Token in der API setzen
         kickbaseAPI.token = token;
+        kickbaseAPI.userId = id;
         kickbaseAPI.email = email;
+        setCurrentUserId(id);
         return true;
       } catch (error) {
         console.error('Fehler beim Parsen der Benutzerdaten:', error);
@@ -74,6 +79,20 @@ export default function LeagueTablePage() {
     if (!leagueId) {
       router.push('/leagues');
       return;
+    }
+
+    // Get league image from localStorage
+    const storedLeague = localStorage.getItem('selectedLeague');
+    if (storedLeague) {
+        try {
+            const selectedLeague = JSON.parse(storedLeague);
+            if (selectedLeague.id === leagueId) {
+                setLeagueName(selectedLeague.name || 'Liga Tabelle');
+                setLeagueImage(selectedLeague.image);
+            }
+        } catch (e) {
+            console.error("Error parsing selectedLeague for header:", e);
+        }
     }
 
     if (checkAuth()) {
@@ -112,7 +131,21 @@ export default function LeagueTablePage() {
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950 dark:to-blue-950">
       <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Kickbase Analyzer</h1>
+          <div className="flex items-center space-x-3">
+            {leagueId && leagueImage && (
+              <button onClick={() => router.push(`/dashboard?league=${leagueId}`)} title="Zum Liga-Dashboard">
+                <img 
+                  src={leagueImage} 
+                  alt="Liga Logo" 
+                  className="h-10 w-10 rounded-md object-cover hover:opacity-80 transition-opacity"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
+              </button>
+            )}
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
+              {leagueName || 'Liga Tabelle'}
+            </h1>
+          </div>
           <button
             onClick={handleBack}
             className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
@@ -181,33 +214,33 @@ export default function LeagueTablePage() {
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {ranking?.us.sort((a, b) => a.spl - b.spl).map((user) => (
-                      <tr key={user.i} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <tr key={user.i}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                           {user.spl}.
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <button
                             onClick={() => router.push(`/manager-squad?league=${leagueId}&user=${user.i}`)}
-                            className="flex items-center group cursor-pointer w-full text-left hover:bg-gray-100 dark:hover:bg-gray-700 px-2 py-1 rounded transition-colors duration-150"
+                            className="flex items-center group w-full text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1 rounded transition-colors"
+                            title={`${user.n} Kader`}
+                            disabled={!leagueId || user.i === currentUserId}
                           >
                             {user.uim ? (
                               <div className="h-10 w-10 flex-shrink-0 mr-3">
                                 <img
                                   src={user.uim}
                                   alt={`${user.n} Profilbild`}
-                                  className={`h-10 w-10 rounded-full object-cover transition-all ${/* kickbaseAPI.userId !== user.i ? */ 'group-hover:ring-2 group-hover:ring-offset-2 group-hover:ring-green-500 dark:group-hover:ring-offset-gray-800' /* : '' */}`}
-                                  onError={(e) => {
-                                    e.currentTarget.src = 'https://via.placeholder.com/40';
-                                  }}
+                                  className={`h-10 w-10 rounded-full object-cover transition-all`}
+                                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://via.placeholder.com/40'; }}
                                 />
                               </div>
                             ) : (
-                              <div className={`h-10 w-10 flex-shrink-0 mr-3 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center transition-all ${/* kickbaseAPI.userId !== user.i ? */ 'group-hover:ring-2 group-hover:ring-offset-2 group-hover:ring-green-500 dark:group-hover:ring-offset-gray-800' /* : '' */}`}>
+                              <div className={`h-10 w-10 flex-shrink-0 mr-3 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center transition-all`}>
                                 <svg className="h-6 w-6 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
                               </div>
                             )}
                             <div className="ml-0">
-                              <div className={`text-sm font-medium transition-colors ${/* kickbaseAPI.userId !== user.i ? */ 'text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400' /* : 'text-gray-500 dark:text-gray-400' */}`}>
+                              <div className={`text-sm font-medium transition-colors ${user.i === currentUserId ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400'}`}>
                                 {user.n}
                               </div>
                               {user.adm && (

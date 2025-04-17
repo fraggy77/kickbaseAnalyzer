@@ -27,6 +27,7 @@ export default function ManagerSquadPage() {
   const [s11TeamValue, setS11TeamValue] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [leagueImage, setLeagueImage] = useState<string | null>(null); // State for league image
 
   useEffect(() => {
     const checkAuth = () => {
@@ -56,6 +57,19 @@ export default function ManagerSquadPage() {
       console.error('Fehlende League ID oder User ID in URL');
       router.push('/leagues');
       return;
+    }
+
+    // Get league image from localStorage
+    const storedLeague = localStorage.getItem('selectedLeague');
+    if (storedLeague) {
+        try {
+            const selectedLeague = JSON.parse(storedLeague);
+            if (selectedLeague.id === leagueId) {
+                setLeagueImage(selectedLeague.image);
+            }
+        } catch (e) {
+            console.error("Error parsing selectedLeague for header:", e);
+        }
     }
 
     if (checkAuth()) {
@@ -134,7 +148,7 @@ export default function ManagerSquadPage() {
   useEffect(() => {
     if (players.length > 0 && startingPlayerIds.length > 0) {
       const value = players
-        .filter(player => startingPlayerIds.includes(player.id || player.pid || ''))
+        .filter(player => startingPlayerIds.includes(player.id || ''))
         .reduce((sum, player) => sum + (player.marketValue || player.mv || 0), 0);
       setS11TeamValue(value);
       console.log("[ManagerSquadPage] S11-Wert berechnet:", value);
@@ -151,9 +165,23 @@ export default function ManagerSquadPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950">
       <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-            Kader von {managerInfo?.name || '...'}
-          </h1>
+          {/* Left side: League Logo (clickable) + Page Title */}
+           <div className="flex items-center space-x-3">
+              {leagueId && leagueImage && (
+                  <button onClick={() => router.push(`/dashboard?league=${leagueId}`)} title="Zum Liga-Dashboard">
+                      <img 
+                          src={leagueImage} 
+                          alt="Liga Logo" 
+                          className="h-10 w-10 rounded-md object-cover hover:opacity-80 transition-opacity"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                      />
+                  </button>
+              )}
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
+                  Kader von {managerInfo?.name || '...'}
+              </h1>
+          </div>
+          {/* Right side: Back Button */}
           <button
             onClick={handleBack}
             className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
@@ -255,41 +283,66 @@ export default function ManagerSquadPage() {
                           const isStarting = startingPlayerIds.includes(normalizedPlayer.id);
                           const teamData = getTeamData(normalizedPlayer.teamId);
 
+                          // Prepare query params for player page
+                          const queryParams = new URLSearchParams({
+                              id: player.id || '',
+                              // firstName not available in this API response
+                              lastName: player.lastName || '',
+                              teamId: player.teamId || '',
+                              leagueId: leagueId || '',
+                              position: (player.position ?? 0).toString(),
+                              status: (player.status ?? 0).toString(),
+                              marketValue: (player.marketValue ?? 0).toString(),
+                              points: (player.points ?? '-').toString(),
+                              avgPoints: '-', // AvgPoints not available here
+                              playerImage: player.pim || '', // Use 'pim' 
+                              mvt: '-1', // MVT not available here
+                          });
+
                           return (
-                            <tr key={normalizedPlayer.id} className={`${isStarting ? 'bg-green-50 dark:bg-green-900/30' : ''}`}>
+                            <tr 
+                              key={player.id} 
+                            >
                               <td className="px-2 py-4 whitespace-nowrap text-center">
                                 {isStarting && (
                                   <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 text-xs font-bold">✓</span>
                                 )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="flex items-center">
+                                <button 
+                                  onClick={() => router.push(`/player?${queryParams.toString()}`)}
+                                  className="flex items-center group text-left w-full hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1 rounded transition-colors"
+                                  title={`${normalizedPlayer.lastName} Details`}
+                                >
                                   {normalizedPlayer.pim && (
                                     <div className="flex-shrink-0 h-10 w-10 mr-3">
                                       <img 
-                                        className="h-10 w-10 rounded-full object-cover" 
+                                        className="h-10 w-10 rounded-full object-cover"
                                         src={normalizedPlayer.pim.startsWith('http') ? normalizedPlayer.pim : `https://kickbase.b-cdn.net/${normalizedPlayer.pim}`} 
                                         alt={`${normalizedPlayer.lastName}`} 
-                                        onError={(e) => {
-                                          e.currentTarget.src = 'https://via.placeholder.com/40';
-                                        }}
+                                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://via.placeholder.com/40'; }}
                                       />
                                     </div>
                                   )}
                                   <div>
-                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
                                       {normalizedPlayer.firstName} {normalizedPlayer.lastName}
                                     </div>
                                   </div>
-                                </div>
+                                 </button>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="flex items-center space-x-2">
+                                <button 
+                                  onClick={() => router.push(`/team-profile?teamId=${normalizedPlayer.teamId}`)}
+                                  className="flex items-center space-x-2 group text-left w-full hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1 rounded transition-colors"
+                                  title={`${teamData.name} Team Profil`}
+                                  disabled={!normalizedPlayer.teamId}
+                                >
                                   {teamData.logo && <img src={`https://kickbase.b-cdn.net/${teamData.logo}`} alt={teamData.name} title={teamData.name} className="h-12 w-12 object-contain flex-shrink-0"/>}
-                                  <span className="text-sm font-medium text-gray-900 dark:text-white truncate" title={teamData.name}>
+                                  <span className="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400" title={teamData.name}>
                                     {teamData.name}
                                   </span>
-                                </div>
+                                 </button>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-500 dark:text-gray-400">{getPositionName(normalizedPlayer.position)}</div>

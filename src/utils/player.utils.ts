@@ -14,9 +14,10 @@ export const getPositionName = (position: number) => {
   export const getStatusName = (status: number) => { // TODO  STRICKEN UND REHAB ADDEN
     switch (status) {
       case 0: return 'Fit';
-      case 1: return 'Gesperrt';
+      case 1: return 'Verletzt';
       case 2: return 'Angeschlagen';
       case 3: return 'Verletzt';
+      case 4: return 'Rehab'
       default: return 'Gesperrt';
     }
   };
