@@ -92,12 +92,6 @@ export default function DashboardPage() {
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">Kickbase Analyzer</h1>
           <div className="flex space-x-4">
             <button
-              onClick={handleBack}
-              className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-            >
-              Zurück
-            </button>
-            <button
               onClick={handleLogout}
               className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
             >

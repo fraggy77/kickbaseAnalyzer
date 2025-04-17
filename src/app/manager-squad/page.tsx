@@ -221,35 +221,40 @@ export default function ManagerSquadPage() {
               {managerInfo && (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
                   <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start">
-                    {managerInfo.managerImage && (
-                      <img
-                        src={managerInfo.managerImage.startsWith('http') ? managerInfo.managerImage : `https://kickbase.b-cdn.net/${managerInfo.managerImage}`}
-                        alt={`${managerInfo.name} Bild`}
-                        className="h-12 w-12 rounded-full object-cover"
-                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                      />
-                    )}
-                    <div>
-                      <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-                        {managerInfo.name}
-                      </h2>
-                      <div className="mt-1 flex items-baseline space-x-4 text-sm text-gray-500 dark:text-gray-400">
-                        <p>Teamwert: <span className="font-semibold text-blue-600 dark:text-blue-400">{formatCurrency(managerInfo.teamValue)}</span></p>
-                        <p>S11-Wert: <span className="font-semibold text-yellow-600 dark:text-yellow-400">{formatCurrency(s11TeamValue)}</span></p>
+                    {/* Left side: Manager Image and Name/Values */}
+                    <div className="flex items-start space-x-4">
+                        {managerInfo.managerImage && (
+                        <img
+                            src={managerInfo.managerImage.startsWith('http') ? managerInfo.managerImage : `https://kickbase.b-cdn.net/${managerInfo.managerImage}`}
+                            alt={`${managerInfo.name} Bild`}
+                            className="h-12 w-12 rounded-full object-cover"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                        />
+                        )}
+                        <div>
+                            <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                                {managerInfo.name}
+                            </h2>
+                            <div className="mt-1 flex items-baseline space-x-4 text-sm text-gray-500 dark:text-gray-400">
+                                <p>Teamwert: <span className="font-semibold text-blue-600 dark:text-blue-400">{formatCurrency(managerInfo.teamValue)}</span></p>
+                                <p>S11-Wert: <span className="font-semibold text-yellow-600 dark:text-yellow-400">{formatCurrency(s11TeamValue)}</span></p>
+                            </div>
+                        </div>
+                    </div>
+                    {/* Right side: Small Performance button - Updated */}
+                     <div>
+                       <button
+                         onClick={() => router.push(`/manager-performance?league=${leagueId}&user=${userId}`)}
+                         className="inline-flex items-center px-6 py-3 border border-blue-300 dark:border-blue-600 shadow-sm text-base font-medium rounded-md text-blue-700 dark:text-blue-100 bg-blue-100 dark:bg-blue-800 hover:bg-blue-200 dark:hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-colors"
+                       >
+                         <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                           {/* Simple Chart Icon */}
+                           <path d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0ZM5.75 14.044a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 .75.75v1.25a.75.75 0 1 1-1.5 0v-.5h-.75a.75.75 0 0 1-.75-.75Zm5.5 0a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 .75.75v1.25a.75.75 0 1 1-1.5 0v-.5h-.75a.75.75 0 0 1-.75-.75Z" />
+                           <path fillRule="evenodd" d="M4 10a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-2.75H4.75a.75.75 0 0 1-.75-.75Zm11.25-3.75a.75.75 0 0 0-1.5 0v6.5a.75.75 0 0 0 1.5 0v-6.5Z" clipRule="evenodd" />
+                         </svg>
+                         Performance
+                       </button>
                       </div>
-                    </div>
-                    <div>
-                      <button
-                        onClick={() => router.push(`/manager-performance?league=${leagueId}&user=${userId}`)}
-                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 shadow-sm text-xs font-medium rounded text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      >
-                        <svg className="-ml-0.5 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M2 10a8 8 0 1116 0 8 8 0 01-16 0z" />
-                          <path d="M12 14a1 1 0 01-.707-.293l-4-4a1 1 0 111.414-1.414L12 11.586l3.293-3.293a1 1 0 011.414 1.414l-4 4A1 1 0 0112 14z" />
-                        </svg>
-                        Performance
-                      </button>
-                    </div>
                   </div>
                 </div>
               )}

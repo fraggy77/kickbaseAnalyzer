@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { kickbaseAPI } from '@/lib/kickbase-api';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Cell } from 'recharts';
@@ -31,7 +31,14 @@ interface ManagerPerformanceData {
   it: SeasonPerformance[]; // Array der Saisons
 }
 
-export default function ManagerPerformancePage() {
+// Rename interface to match expected type
+interface ManagerPerformanceData {
+    leagueName?: string;
+    managerName?: string;
+    performanceHistory?: { date: string; value: number }[]; 
+}
+
+function ManagerPerformanceContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const leagueId = searchParams.get('league');
@@ -43,8 +50,24 @@ export default function ManagerPerformancePage() {
   const [managerName, setManagerName] = useState<string>('...');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [leagueImage, setLeagueImage] = useState<string | null>(null); // State for league image
 
   useEffect(() => {
+    // Get selected league image from localStorage
+    if (leagueId) {
+      const storedLeague = localStorage.getItem('selectedLeague');
+      if (storedLeague) {
+        try {
+          const league = JSON.parse(storedLeague);
+          if (league.id === leagueId) {
+            setLeagueImage(league.image);
+          }
+        } catch (e) {
+          console.error("Error parsing selectedLeague for Perf header:", e);
+        }
+      }
+    }
+
     const checkAuth = () => { // Auth-Check bleibt gleich
       const storedUser = localStorage.getItem('kickbaseUser');
       if (!storedUser) { router.push('/'); return false; }
@@ -138,9 +161,21 @@ export default function ManagerPerformancePage() {
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-pink-50 dark:from-indigo-950 dark:to-pink-950">
       <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-            Performance: {managerName}
-          </h1>
+          <div className="flex items-center space-x-3">
+            {leagueId && leagueImage && (
+              <button onClick={() => router.push(`/dashboard?league=${leagueId}`)} title="Zum Liga-Dashboard">
+                <img 
+                  src={leagueImage} 
+                  alt="Liga Logo" 
+                  className="h-10 w-10 rounded-md object-cover hover:opacity-80 transition-opacity"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
+              </button>
+            )}
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
+              Performance: {managerName}
+            </h1>
+          </div>
           <button onClick={handleBack} className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
             Zurück zur Tabelle
           </button>
@@ -213,3 +248,5 @@ export default function ManagerPerformancePage() {
     </div>
   );
 }
+
+export default ManagerPerformanceContent;
