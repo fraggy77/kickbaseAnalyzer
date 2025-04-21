@@ -7,6 +7,13 @@ import { getPositionName, getStatusName, getTeamData } from '@/utils/player.util
 
 const CDN_BASE_URL = 'https://kickbase.b-cdn.net/';
 
+// Value history interface
+interface ValueHistory {
+    player_id: string;
+    date: string;
+    value: number;
+}
+
 // Helper to decode or return default
 const getQueryParam = (params: URLSearchParams | null, key: string, defaultValue: string = '-') => {
     return params?.get(key) ? decodeURIComponent(params.get(key)!) : defaultValue;
@@ -31,6 +38,9 @@ function PlayerInfoContent() {
     const mvt = parseInt(getQueryParam(searchParams, 'mvt', '-1')); // Market Value Trend
 
     const [leagueImage, setLeagueImage] = useState<string | null>(null);
+    const [valueHistory, setValueHistory] = useState<ValueHistory[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     // Get league image from localStorage
     useEffect(() => {
@@ -48,6 +58,38 @@ function PlayerInfoContent() {
             }
         }
     }, [leagueId]);
+
+    // Fetch player value history
+    useEffect(() => {
+        const fetchValueHistory = async () => {
+            if (!playerId || playerId === '-') return;
+            
+            setIsLoading(true);
+            setError(null);
+            try {
+                // Construct the URL with query parameter
+                const apiUrl = `/api/player-values?playerId=${encodeURIComponent(playerId)}`;
+                console.log("Fetching player values from:", apiUrl);
+
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+                const data: ValueHistory[] = await response.json();
+                setValueHistory(data);
+                console.log(`Fetched ${data.length} value entries for player ${playerId}`);
+
+            } catch (e) {
+                console.error("Failed to fetch player values:", e);
+                setError(e instanceof Error ? e.message : 'Failed to load player values.');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchValueHistory();
+    }, [playerId]);
 
     const teamData = getTeamData(teamId ?? '');
 
@@ -137,7 +179,54 @@ function PlayerInfoContent() {
                             <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Ø Punkte</dt>
                             <dd className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">{avgPoints}</dd>
                         </div>
+                        <div>
+                            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Spieler-ID</dt>
+                            <dd className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">{playerId}</dd>
+                        </div>
                          {/* Add more fields here later as needed */}
+                    </div>
+                </div>
+                
+                {/* Value History Section */}
+                <div className="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white">Wertentwicklung</h3>
+                    </div>
+                    
+                    <div className="px-6 py-4">
+                        {isLoading ? (
+                            <p className="text-gray-600 dark:text-gray-400 text-center py-4">Lade Wertdaten...</p>
+                        ) : error ? (
+                            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative dark:bg-red-900/30 dark:border-red-600 dark:text-red-300">
+                                <strong className="font-bold">Fehler!</strong>
+                                <span className="block sm:inline"> {error}</span>
+                            </div>
+                        ) : valueHistory.length === 0 ? (
+                            <p className="text-gray-600 dark:text-gray-400 text-center py-4">Keine Wertdaten verfügbar.</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                    <thead className="bg-gray-50 dark:bg-gray-700">
+                                        <tr>
+                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Datum</th>
+                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Wert</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                        {valueHistory.map((entry, index) => (
+                                            <tr key={index}>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                    {new Date(entry.date).toLocaleDateString('de-DE')}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                                    {formatCurrency(entry.value)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                 </div>
             </main>
