@@ -30,6 +30,7 @@ interface PlayerStats {
     status: number;
     liga_note: number | null;
     injury_text: string | null;
+    forecast: number | null;
 }
 
 // Club matches interface
@@ -39,8 +40,10 @@ interface ClubMatch {
     match_date: string;
     match_id: string;
     home_club_id: string;
+    home_club_shortname: string;
     home_score: number;
     away_club_id: string;
+    away_club_shortname: string;
     away_score: number;
     home_probabilities: number;
     away_probabilities: number;
@@ -526,6 +529,19 @@ function PlayerInfoContent() {
                                                 </tr>
                                                 <tr>
                                                     <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-white dark:bg-gray-800 z-10">
+                                                        Forecast:
+                                                    </td>
+                                                    {Array.from({ length: 34 }, (_, i) => i + 1).map((matchday) => {
+                                                        const matchingStat = playerStats.find(stat => stat.matchday === matchday);
+                                                        return (
+                                                            <td key={matchday} className="px-3 py-2 text-center text-sm text-gray-500 dark:text-gray-400">
+                                                                {matchingStat && matchingStat.forecast !== null ? matchingStat.forecast : '-'}
+                                                            </td>
+                                                        );
+                                                    })}
+                                                </tr>
+                                                <tr>
+                                                    <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-white dark:bg-gray-800 z-10">
                                                         Gelb:
                                                     </td>
                                                     {Array.from({ length: 34 }, (_, i) => i + 1).map((matchday) => {
@@ -600,21 +616,6 @@ function PlayerInfoContent() {
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                            {/* Saison */}
-                                            <tr>
-                                                <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-white dark:bg-gray-800 z-10">
-                                                    Saison:
-                                                </td>
-                                                {Array.from({ length: 34 }, (_, i) => i + 1).map((matchday) => {
-                                                    const matchingMatch = clubMatches.find(match => match.matchday === matchday);
-                                                    return (
-                                                        <td key={matchday} className="px-3 py-2 text-center text-sm text-gray-500 dark:text-gray-400">
-                                                            {matchingMatch ? matchingMatch.season : '-'}
-                                                        </td>
-                                                    );
-                                                })}
-                                            </tr>
-                                            
                                             {/* Datum */}
                                             <tr className="bg-gray-50 dark:bg-gray-700/50">
                                                 <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-gray-50 dark:bg-gray-700/50 z-10">
@@ -632,25 +633,164 @@ function PlayerInfoContent() {
                                                 })}
                                             </tr>
                                             
-                                            {/* Match ID */}
+                                            {/* Place (Heim/Auswärts) */}
                                             <tr>
                                                 <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-white dark:bg-gray-800 z-10">
-                                                    Match ID:
+                                                    Place:
+                                                </td>
+                                                {Array.from({ length: 34 }, (_, i) => i + 1).map((matchday) => {
+                                                    const matchingMatch = clubMatches.find(match => match.matchday === matchday);
+                                                    // Debug-Ausgabe für den ersten Eintrag
+                                                    if (matchingMatch && matchday === 1) {
+                                                        console.log('Vergleiche für Spieltag 1:');
+                                                        console.log('teamId:', teamId, 'Typ:', typeof teamId);
+                                                        console.log('home_club_id:', matchingMatch.home_club_id, 'Typ:', typeof matchingMatch.home_club_id);
+                                                    }
+                                                    
+                                                    // Stelle sicher, dass beide als Strings verglichen werden
+                                                    const playerTeamId = String(teamId);
+                                                    const homeClubId = String(matchingMatch?.home_club_id || '');
+                                                    const isHome = playerTeamId === homeClubId;
+                                                    
+                                                    return (
+                                                        <td key={matchday} className="px-3 py-2 text-center text-sm text-gray-500 dark:text-gray-400">
+                                                            {matchingMatch ? (isHome ? 'H' : 'A') : '-'}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                            
+                                            {/* Gegner-ID */}
+                                            {/* 
+                                            <tr className="bg-gray-50 dark:bg-gray-700/50">
+                                                <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-gray-50 dark:bg-gray-700/50 z-10">
+                                                    Gegner-ID:
+                                                </td>
+                                                {Array.from({ length: 34 }, (_, i) => i + 1).map((matchday) => {
+                                                    const matchingMatch = clubMatches.find(match => match.matchday === matchday);
+                                                    // Stelle sicher, dass beide als Strings verglichen werden
+                                                    const playerTeamId = String(teamId);
+                                                    const homeClubId = String(matchingMatch?.home_club_id || '');
+                                                    const isHome = playerTeamId === homeClubId;
+                                                    
+                                                    // Bestimme die Gegner-ID basierend darauf, ob der Spieler im Heim- oder Auswärtsteam ist
+                                                    const opponentId = matchingMatch ? 
+                                                        (isHome ? matchingMatch.away_club_id : matchingMatch.home_club_id) : '-';
+                                                    
+                                                    return (
+                                                        <td key={matchday} className="px-3 py-2 text-center text-sm text-gray-500 dark:text-gray-400">
+                                                            {opponentId}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                            */}
+                                            
+                                            {/* Gegner Name */}
+                                            <tr className="bg-gray-50 dark:bg-gray-700/50">
+                                                <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-gray-50 dark:bg-gray-700/50 z-10">
+                                                    Gegner:
+                                                </td>
+                                                {Array.from({ length: 34 }, (_, i) => i + 1).map((matchday) => {
+                                                    const matchingMatch = clubMatches.find(match => match.matchday === matchday);
+                                                    if (!matchingMatch) return <td key={matchday} className="px-3 py-2 text-center text-sm text-gray-500 dark:text-gray-400">-</td>;
+                                                    
+                                                    const playerTeamId = String(teamId);
+                                                    const homeClubId = String(matchingMatch.home_club_id || '');
+                                                    const isHome = playerTeamId === homeClubId;
+                                                    
+                                                    // Bestimme den Kurznamen des Gegners
+                                                    const opponentShortname = isHome ? 
+                                                        matchingMatch.away_club_shortname : 
+                                                        matchingMatch.home_club_shortname;
+                                                    
+                                                    return (
+                                                        <td key={matchday} className="px-3 py-2 text-center text-sm text-gray-500 dark:text-gray-400">
+                                                            {opponentShortname || '-'}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                            
+                                            {/* Ergebnis (W/D/L) */}
+                                            <tr>
+                                                <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-white dark:bg-gray-800 z-10">
+                                                    W/D/L:
+                                                </td>
+                                                {Array.from({ length: 34 }, (_, i) => i + 1).map((matchday) => {
+                                                    const matchingMatch = clubMatches.find(match => match.matchday === matchday);
+                                                    if (!matchingMatch) return <td key={matchday} className="px-3 py-2 text-center text-sm text-gray-500 dark:text-gray-400">-</td>;
+                                                    
+                                                    const playerTeamId = String(teamId);
+                                                    const homeClubId = String(matchingMatch.home_club_id || '');
+                                                    const isHome = playerTeamId === homeClubId;
+                                                    
+                                                    // Bestimme das Ergebnis aus Sicht des Spielers
+                                                    let result = 'D'; // Unentschieden als Standard
+                                                    const homeScore = matchingMatch.home_score;
+                                                    const awayScore = matchingMatch.away_score;
+                                                    
+                                                    if (homeScore > awayScore) {
+                                                        // Heimteam hat gewonnen
+                                                        result = isHome ? 'W' : 'L';
+                                                    } else if (homeScore < awayScore) {
+                                                        // Auswärtsteam hat gewonnen
+                                                        result = isHome ? 'L' : 'W';
+                                                    }
+                                                    
+                                                    // Farbcodierung für das Ergebnis
+                                                    let resultClass = "text-yellow-500 dark:text-yellow-400 font-medium"; // Unentschieden
+                                                    if (result === 'W') {
+                                                        resultClass = "text-green-600 dark:text-green-400 font-bold";
+                                                    } else if (result === 'L') {
+                                                        resultClass = "text-red-600 dark:text-red-400 font-medium";
+                                                    }
+                                                    
+                                                    return (
+                                                        <td key={matchday} className={`px-3 py-2 text-center text-sm ${resultClass}`}>
+                                                            {result}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                            
+                                            {/* Ergebnis (Score) */}
+                                            <tr className="bg-gray-50 dark:bg-gray-700/50">
+                                                <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-gray-50 dark:bg-gray-700/50 z-10">
+                                                    Ergebnis:
                                                 </td>
                                                 {Array.from({ length: 34 }, (_, i) => i + 1).map((matchday) => {
                                                     const matchingMatch = clubMatches.find(match => match.matchday === matchday);
                                                     return (
                                                         <td key={matchday} className="px-3 py-2 text-center text-sm text-gray-500 dark:text-gray-400">
-                                                            {matchingMatch ? matchingMatch.match_id : '-'}
+                                                            {matchingMatch ? `${matchingMatch.home_score}:${matchingMatch.away_score}` : '-'}
                                                         </td>
                                                     );
                                                 })}
                                             </tr>
                                             
                                             {/* Heim Verein */}
+                                            {/*
+                                            <tr>
+                                                <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-white dark:bg-gray-800 z-10">
+                                                    Heim:
+                                                </td>
+                                                {Array.from({ length: 34 }, (_, i) => i + 1).map((matchday) => {
+                                                    const matchingMatch = clubMatches.find(match => match.matchday === matchday);
+                                                    return (
+                                                        <td key={matchday} className="px-3 py-2 text-center text-sm text-gray-500 dark:text-gray-400">
+                                                            {matchingMatch ? matchingMatch.home_club_shortname : '-'}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                            */}
+                                            
+                                            {/* Heim ID */}
+                                            {/*
                                             <tr className="bg-gray-50 dark:bg-gray-700/50">
                                                 <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-gray-50 dark:bg-gray-700/50 z-10">
-                                                    Heim:
+                                                    Heim ID:
                                                 </td>
                                                 {Array.from({ length: 34 }, (_, i) => i + 1).map((matchday) => {
                                                     const matchingMatch = clubMatches.find(match => match.matchday === matchday);
@@ -661,55 +801,11 @@ function PlayerInfoContent() {
                                                     );
                                                 })}
                                             </tr>
-                                            
-                                            {/* Heim Tore */}
-                                            <tr>
-                                                <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-white dark:bg-gray-800 z-10">
-                                                    Heim-Tore:
-                                                </td>
-                                                {Array.from({ length: 34 }, (_, i) => i + 1).map((matchday) => {
-                                                    const matchingMatch = clubMatches.find(match => match.matchday === matchday);
-                                                    return (
-                                                        <td key={matchday} className="px-3 py-2 text-center text-sm text-gray-500 dark:text-gray-400">
-                                                            {matchingMatch ? matchingMatch.home_score : '-'}
-                                                        </td>
-                                                    );
-                                                })}
-                                            </tr>
-                                            
-                                            {/* Auswärts Verein */}
-                                            <tr className="bg-gray-50 dark:bg-gray-700/50">
-                                                <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-gray-50 dark:bg-gray-700/50 z-10">
-                                                    Auswärts:
-                                                </td>
-                                                {Array.from({ length: 34 }, (_, i) => i + 1).map((matchday) => {
-                                                    const matchingMatch = clubMatches.find(match => match.matchday === matchday);
-                                                    return (
-                                                        <td key={matchday} className="px-3 py-2 text-center text-sm text-gray-500 dark:text-gray-400">
-                                                            {matchingMatch ? matchingMatch.away_club_id : '-'}
-                                                        </td>
-                                                    );
-                                                })}
-                                            </tr>
-                                            
-                                            {/* Auswärts Tore */}
-                                            <tr>
-                                                <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-white dark:bg-gray-800 z-10">
-                                                    Auswärts-Tore:
-                                                </td>
-                                                {Array.from({ length: 34 }, (_, i) => i + 1).map((matchday) => {
-                                                    const matchingMatch = clubMatches.find(match => match.matchday === matchday);
-                                                    return (
-                                                        <td key={matchday} className="px-3 py-2 text-center text-sm text-gray-500 dark:text-gray-400">
-                                                            {matchingMatch ? matchingMatch.away_score : '-'}
-                                                        </td>
-                                                    );
-                                                })}
-                                            </tr>
+                                            */}
                                             
                                             {/* Wahrscheinlichkeiten */}
-                                            <tr className="bg-gray-50 dark:bg-gray-700/50">
-                                                <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-gray-50 dark:bg-gray-700/50 z-10">
+                                            <tr>
+                                                <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-white dark:bg-gray-800 z-10">
                                                     Heim-W:
                                                 </td>
                                                 {Array.from({ length: 34 }, (_, i) => i + 1).map((matchday) => {
@@ -722,8 +818,8 @@ function PlayerInfoContent() {
                                                 })}
                                             </tr>
                                             
-                                            <tr>
-                                                <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-white dark:bg-gray-800 z-10">
+                                            <tr className="bg-gray-50 dark:bg-gray-700/50">
+                                                <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-gray-50 dark:bg-gray-700/50 z-10">
                                                     Unentschieden:
                                                 </td>
                                                 {Array.from({ length: 34 }, (_, i) => i + 1).map((matchday) => {
@@ -736,8 +832,8 @@ function PlayerInfoContent() {
                                                 })}
                                             </tr>
                                             
-                                            <tr className="bg-gray-50 dark:bg-gray-700/50">
-                                                <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-gray-50 dark:bg-gray-700/50 z-10">
+                                            <tr>
+                                                <td className="px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 sticky left-0 bg-white dark:bg-gray-800 z-10">
                                                     Auswärts-W:
                                                 </td>
                                                 {Array.from({ length: 34 }, (_, i) => i + 1).map((matchday) => {

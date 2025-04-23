@@ -16,30 +16,36 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // SQL-Query vorbereiten
+    // SQL-Query vorbereiten mit JOIN zu clubs_table
     const sqlQuery = `
       SELECT 
-        season,
-        matchday,
-        match_date,
-        match_id,
-        home_club_id,
-        home_score,
-        away_club_id,
-        away_score,
-        home_probabilities,
-        away_probabilities,
-        draw_probabilities
+        m.season,
+        m.matchday,
+        m.match_date,
+        m.match_id,
+        m.home_club_id,
+        h.club_shortname as home_club_shortname,
+        m.home_score,
+        m.away_club_id,
+        a.club_shortname as away_club_shortname,
+        m.away_score,
+        m.home_probabilities,
+        m.away_probabilities,
+        m.draw_probabilities
       FROM 
-        matches_table
+        matches_table m
+      LEFT JOIN 
+        clubs_table h ON m.home_club_id = h.club_id
+      LEFT JOIN 
+        clubs_table a ON m.away_club_id = a.club_id
       WHERE 
-        home_club_id = $1 OR away_club_id = $1
+        m.home_club_id = $1 OR m.away_club_id = $1
       ORDER BY 
-        season DESC, matchday ASC
+        m.season DESC, m.matchday ASC
     `;
 
     client = await pool.connect();
-    console.log(`API-Route /api/club-matches - Query ausführen: ${sqlQuery} mit Vereins-ID:`, clubId);
+    console.log(`API-Route /api/club-matches - Query ausführen mit Vereins-ID:`, clubId);
 
     const result = await client.query(sqlQuery, [clubId]);
 

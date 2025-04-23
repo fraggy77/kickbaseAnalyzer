@@ -31,7 +31,8 @@ export async function GET(request: NextRequest) {
         assist,
         status,
         liga_note,
-        injury_text
+        injury_text,
+        forecast
       FROM 
         player_ranking
       WHERE 
