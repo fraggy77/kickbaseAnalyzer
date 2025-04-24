@@ -10,6 +10,9 @@ interface TeamProfilePlayer {
   i: string; n: string; lst?: number; st?: number; pos?: number; 
   mv?: number; mvt?: number; ap?: number; iotm?: boolean; ofc?: number;
   tid?: string; sdmvt?: number; mvgl?: number; pim?: string;
+  oui?: number;    // Owner User ID
+  onm?: string;    // Owner Name
+  uim?: string;    // Owner User Image path
 }
 interface TeamProfileResponse {
   tid: string; tn: string; pl: number; tv: number; tw: number;
@@ -53,9 +56,16 @@ function TeamProfileContent() {
       setIsLoading(true);
       setError('');
       try {
-        console.log(`[TeamProfilePage] Fetching profile for team ID: ${teamId}`);
-        // Assuming competition ID 1 for Bundesliga
-        const data = await kickbaseAPI.getTeamProfile('1', teamId);
+        // Check if leagueId is available before fetching
+        if (!selectedLeagueId) {
+            setError('Liga ID nicht im Speicher gefunden. Bitte wähle eine Liga im Dashboard aus.');
+            setIsLoading(false);
+            return;
+        }
+        console.log(`[TeamProfilePage] Fetching profile for team ID: ${teamId} in league ID: ${selectedLeagueId}`);
+        // Assuming competition ID 1 for Bundesliga, pass leagueId as a query param
+        // The backend route will need to be adjusted to read this leagueId
+        const data = await kickbaseAPI.getTeamProfile('1', teamId, selectedLeagueId); 
         console.log('[TeamProfilePage] Profile data received:', data);
         setProfile(data);
       } catch (err: any) {
@@ -70,9 +80,9 @@ function TeamProfileContent() {
       }
     };
 
-    // Check auth before loading
+    // Check auth and leagueId before loading
     const storedUser = localStorage.getItem('kickbaseUser');
-    if (storedUser) {
+    if (storedUser && selectedLeagueId) { // Ensure leagueId is loaded before trying to fetch
         try {
              const { token, id, email } = JSON.parse(storedUser);
              kickbaseAPI.token = token; // Ensure API client has token
@@ -85,20 +95,33 @@ function TeamProfileContent() {
              setIsLoading(false);
              // router.push('/'); // Optional redirect
         }
-    } else {
-        setError("Nicht eingeloggt.");
-        setIsLoading(false);
+    } else if (!selectedLeagueId && !isLoading) {
+         // Handle case where localStorage has user but no leagueId yet (wait for effect)
+         if (!storedUser) {
+            setError("Nicht eingeloggt.");
+            setIsLoading(false);
+         }
+         // If user exists, the useEffect will re-run once selectedLeagueId is set
+    } else if (!storedUser) {
+         setError("Nicht eingeloggt.");
+         setIsLoading(false);
         // router.push('/'); // Optional redirect
     }
 
-  }, [teamId, router]);
+  }, [teamId, router, selectedLeagueId]); // Add selectedLeagueId to dependency array
 
   const handleBack = () => { router.back(); };
 
-  // Helper to safely get player image URL
-  const getPlayerImageUrl = (pim?: string) => {
-    if (!pim) return '/placeholder.png';
-    return pim.startsWith('http') || pim.startsWith('/') ? pim : `${CDN_BASE_URL}${pim}`;
+  // Helper to safely get image URL (can handle player or user images)
+  const getImageUrl = (path?: string, userId?: string | number) => {
+    if (!path) return '/placeholder.png';
+    if (path.startsWith('http') || path.startsWith('/')) return path;
+    // Check if it's likely a user image path that needs the ID
+    if (userId && !path.includes('/')) { // Simple filename like profile.png for user
+        return `${CDN_BASE_URL}user/${userId}/${path}`;
+    } 
+    // Assume other paths are relative to base (player images, flags etc.)
+    return `${CDN_BASE_URL}${path}`;
   };
 
   return (
@@ -183,6 +206,7 @@ function TeamProfileContent() {
                        <thead className="bg-gray-50 dark:bg-gray-750">
                           <tr>
                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Spieler</th>
+                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Besitzer</th>
                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Position</th>
                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
                              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Marktwert</th>
@@ -208,6 +232,11 @@ function TeamProfileContent() {
                                      mvt: (player.mvt ?? -1).toString(),
                                  });
 
+                                // Add selectedLeagueId to player link params if available
+                                if(selectedLeagueId) {
+                                    queryParams.set('leagueId', selectedLeagueId);
+                                }
+
                                 return (
                                     <tr 
                                       key={player.i} 
@@ -222,7 +251,7 @@ function TeamProfileContent() {
                                             <div className="flex-shrink-0 h-10 w-10 mr-3">
                                                 <img
                                                 className="h-10 w-10 rounded-full object-cover"
-                                                src={getPlayerImageUrl(player.pim)}
+                                                src={getImageUrl(player.pim)}
                                                 alt={player.n}
                                                 onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/placeholder.png'; }}
                                                 />
@@ -231,6 +260,27 @@ function TeamProfileContent() {
                                                 {player.n} {/** Assuming 'n' is LastName */}
                                             </div>
                                          </button>
+                                      </td>
+                                      {/* Owner Cell - ADDED */}
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                        {player.onm && player.oui ? (
+                                            <button 
+                                                onClick={() => router.push(`/manager-squad?league=${selectedLeagueId}&user=${player.oui}`)}
+                                                className="flex items-center space-x-2 group text-left w-full hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1 rounded transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                                                title={`${player.onm} Kader`}
+                                                disabled={!selectedLeagueId} // Disable if no league context
+                                            >
+                                                <img 
+                                                    src={getImageUrl(player.uim, player.oui)} // Use helper for user image
+                                                    alt={player.onm}
+                                                    className="h-5 w-5 rounded-full flex-shrink-0 object-cover"
+                                                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display='none';}} // Hide broken image
+                                                />
+                                                <span className="group-hover:text-indigo-600 dark:group-hover:text-indigo-400 truncate">{player.onm}</span>
+                                            </button>
+                                        ) : (
+                                            <span className="italic">Kickbase</span>
+                                        )}
                                       </td>
                                       {/* Position */}
                                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -255,7 +305,7 @@ function TeamProfileContent() {
                              })
                           ) : (
                              <tr>
-                                <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">Keine Spieler gefunden.</td>
+                                <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">Keine Spieler gefunden.</td>
                              </tr>
                           )}
                        </tbody>

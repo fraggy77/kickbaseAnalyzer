@@ -63,6 +63,9 @@ interface TeamProfilePlayer {
   sdmvt?: number;  // Seven Day Market Value Trend?
   mvgl?: number;   // Market Value Gain/Loss (overall?)
   pim?: string;    // Player Image path
+  oui?: number;    // Owner User ID (assuming number)
+  onm?: string;    // Owner Name
+  uim?: string;    // Owner User Image path
 }
 
 interface TeamProfileResponse {
@@ -81,6 +84,17 @@ interface TeamProfileResponse {
   plpurl?: string;      // Placeholder Logo?
 }
 // --- End Team Profile Types ---
+
+// Interface for user in league ranking (for linter fix)
+interface LeagueRankingUser {
+    i: string; // User ID
+    n?: string; // User name
+    p?: number; // Points
+    r?: number; // Rank
+    pim?: string; // User image path? - Unused in current logic but maybe uim?
+    uim?: string; // User image path
+    // Add other fields if necessary based on actual API response
+}
 
 class KickbaseAPI {
   token: string | null = null;
@@ -102,7 +116,7 @@ class KickbaseAPI {
         body: JSON.stringify({ email, password }),
       });
 
-      let data: LoginResponseData;
+      let data: any; // Use any temporarily to check for message
       try {
         data = await response.json();
       } catch (error) {
@@ -111,22 +125,26 @@ class KickbaseAPI {
         throw new Error(`Login fehlgeschlagen: Ungültiges Antwortformat von der internen API (Status: ${response.status} ${statusText})`);
       }
 
-      if (!response.ok || data.message) {
-         throw new Error((data as any).message || 'Login fehlgeschlagen (API-Antwort nicht ok)');
+      // Check for error message *before* assuming LoginResponseData structure
+      if (!response.ok || data.message) { 
+         throw new Error(data.message || 'Login fehlgeschlagen (API-Antwort nicht ok)');
       }
 
-      if (!data.token || !data.user) {
+      // If OK and no message, *now* treat as LoginResponseData
+      const loginData = data as LoginResponseData;
+
+      if (!loginData.token || !loginData.user) {
         console.error('Frontend: Kein Token oder User in der Antwort von /api/auth', data);
         throw new Error('Login fehlgeschlagen: Unvollständige Daten von interner API erhalten');
       }
 
-      this.token = data.token;
-      this.userId = data.user.id;
+      this.token = loginData.token;
+      this.userId = loginData.user.id;
       this.email = email;
 
       console.log('Frontend: Login erfolgreich - Benutzer-ID:', this.userId);
 
-      return data;
+      return loginData;
     } catch (error: any) {
       console.error('Kickbase Login Fehler:', error);
       throw error;
@@ -278,18 +296,21 @@ class KickbaseAPI {
    */
   async getLeagueRanking(leagueId: string): Promise<any> {
     try {
-      // console.log('Frontend: Liga-Ranking-Anfrage für ID', leagueId); // Optional: Enable for debugging
       const data = await this._fetchInternal(`/api/leagues/${leagueId}/ranking`);
 
       // Bild-URLs korrigieren
       if (data && data.us && Array.isArray(data.us)) {
-        data.us = data.us.map(user => {
+        // Provide type for user parameter in map
+        data.us = data.us.map((user: LeagueRankingUser) => {
           if (user.uim && !user.uim.startsWith('http')) {
-            // Prüfen ob es schon der cdn pfad ist
-            if (!user.uim.startsWith('users/')) {
-                 user.uim = `https://kickbase.b-cdn.net/${user.uim}`;
+            // Corrected logic based on example and common Kickbase patterns
+            if (!user.uim.includes('/')) { // Simple filename like profile.png
+                 user.uim = `${BASE_URL}user/${user.i}/${user.uim}`;
+            } else if (!user.uim.startsWith('user/') && !user.uim.startsWith('league/')) { // Assuming relative path like flags/icon.png
+                 user.uim = `${BASE_URL}${user.uim}`;
             } else {
-                 user.uim = `https://kickbase.b-cdn.net/user/${user.i}/${user.uim}`; // Annahme: user ID 'i' ist verfügbar
+                 // Already looks like a relative CDN path (e.g., user/xyz/img.png) - prepend base
+                 user.uim = `${BASE_URL}${user.uim}`;
             }
           }
           return user;
@@ -365,23 +386,32 @@ class KickbaseAPI {
   }
 
   /**
-   * Ruft das Profil eines Bundesliga-Teams ab.
+   * Ruft das Profil eines Teams ab.
    * Calls the internal API route using the authenticated fetch helper.
+   * If leagueId is provided, it attempts to fetch league-specific data including owners.
+   * Otherwise, fetches general competition data (without owners).
    */
-  async getTeamProfile(competitionId: string, teamId: string): Promise<TeamProfileResponse> {
+  async getTeamProfile(competitionId: string, teamId: string, leagueId?: string): Promise<TeamProfileResponse> {
     try {
-      // console.log(`Frontend: Team Profile Anfrage für Comp ${competitionId}, Team ${teamId}`);
-      const data = await this._fetchInternal(`/api/competitions/${competitionId}/teams/${teamId}/profile`);
+      // Construct the internal API path
+      let apiPath = `/api/competitions/${competitionId}/teams/${teamId}/profile`;
+      if (leagueId) {
+        // Append leagueId as a query parameter if provided
+        apiPath += `?leagueId=${encodeURIComponent(leagueId)}`;
+      }
       
-      // Basic validation (more specific checks could be added)
-      if (!data || typeof data !== 'object' || !Array.isArray(data.it)) {
-          console.error("Unerwartete Antwort von /api/competitions/.../teams/.../profile:", data);
+      // Call the internal API route which will fetch from the external Kickbase API
+      console.log(`[kickbaseAPI] Fetching team profile via internal route: ${apiPath}`);
+      const data = await this._fetchInternal(apiPath);
+
+      if (!data || typeof data !== 'object' || !data.tid) {
+          console.error(`Unerwartete Antwort von ${apiPath}:`, data);
           throw new Error("Ungültiges Datenformat für Team-Profil erhalten");
       }
-      return data as TeamProfileResponse; // Cast to the specific type
+      return data;
     } catch (error) {
-      console.error(`Kickbase API Fehler (getTeamProfile ${competitionId}/${teamId}):`, error);
-      throw error; // Re-throw
+      console.error(`Kickbase API Fehler (getTeamProfile comp=${competitionId}, team=${teamId}, league=${leagueId || 'N/A'}):`, error);
+      throw error;
     }
   }
 }
