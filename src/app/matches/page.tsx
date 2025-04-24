@@ -31,24 +31,69 @@ interface TeamData {
 export default function MatchesPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const leagueId = searchParams.get('league'); // Get leagueId if needed for back navigation etc.
+    const leagueId = searchParams.get('league');
 
     const [matches, setMatches] = useState<Match[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingMatches, setIsLoadingMatches] = useState<boolean>(true);
+    const [isLoadingMatchday, setIsLoadingMatchday] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const [selectedMatchday, setSelectedMatchday] = useState<number>(30); // Default to matchday 30
-    const [selectedSeason, setSelectedSeason] = useState<string>('24/25'); // Default to season 24/25
+    const [selectedMatchday, setSelectedMatchday] = useState<number | null>(null);
+    const [selectedSeason, setSelectedSeason] = useState<string>('24/25');
+    const [leagueImage, setLeagueImage] = useState<string | null>(null); // State for league image
 
-    // Fetch matches based on selectedSeason and selectedMatchday
     useEffect(() => {
-        const fetchMatches = async () => {
-            setIsLoading(true);
+        // Get league image from localStorage
+        if (leagueId) {
+            const storedLeague = localStorage.getItem('selectedLeague');
+            if (storedLeague) {
+                try {
+                    const selectedLeague = JSON.parse(storedLeague);
+                    if (selectedLeague.id === leagueId) {
+                        setLeagueImage(selectedLeague.image);
+                    }
+                } catch (e) {
+                    console.error("Error parsing selectedLeague for header:", e);
+                }
+            }
+        }
+
+        const fetchCurrentMatchday = async () => {
+            console.log("Fetching current matchday...");
+            setIsLoadingMatchday(true);
             setError(null);
             try {
-                // Construct the URL with query parameters
-                const apiUrl = `/api/matches?season=${encodeURIComponent(selectedSeason)}&matchday=${selectedMatchday}`;
-                console.log("Fetching matches from:", apiUrl);
+                const response = await fetch('/api/current-matchday');
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || 'Failed to fetch current matchday');
+                }
+                const data = await response.json();
+                console.log("Current matchday received:", data.currentMatchday);
+                setSelectedMatchday(data.currentMatchday);
+            } catch (e: any) {
+                console.error("Error fetching current matchday:", e);
+                setError(e.message);
+                setSelectedMatchday(1);
+            } finally {
+                setIsLoadingMatchday(false);
+            }
+        };
 
+        fetchCurrentMatchday();
+    }, [leagueId]);
+
+    useEffect(() => {
+        if (selectedMatchday === null) {
+            console.log("Waiting for selectedMatchday...");
+            return;
+        }
+
+        const fetchMatches = async () => {
+            console.log(`Fetching matches for MD: ${selectedMatchday}`);
+            setIsLoadingMatches(true);
+            setError(null);
+            try {
+                const apiUrl = `/api/matches?season=${encodeURIComponent(selectedSeason)}&matchday=${selectedMatchday}`;
                 const response = await fetch(apiUrl);
                 if (!response.ok) {
                     const errorData = await response.json();
@@ -56,43 +101,52 @@ export default function MatchesPage() {
                 }
                 const data: Match[] = await response.json();
                 setMatches(data);
-                console.log(`Fetched ${data.length} matches for MD ${selectedMatchday}`);
-
             } catch (e: any) {
                 console.error("Failed to fetch matches:", e);
                 setError(e.message || 'Failed to load matches.');
             } finally {
-                setIsLoading(false);
+                setIsLoadingMatches(false);
             }
         };
 
         fetchMatches();
-    }, [selectedSeason, selectedMatchday]); // Refetch when season or matchday changes
+    }, [selectedSeason, selectedMatchday]);
 
     const handleBack = () => {
-        // Navigate back to the dashboard, potentially passing the leagueId
         router.push(leagueId ? `/dashboard?league=${leagueId}` : '/leagues');
     };
 
-    // Function to get team details (name, logo) - uses your existing utility
     const getTeamDisplayData = (teamId: number): TeamData => {
-        const data = getTeamData(teamId.toString()); // Use your utility
+        const data = getTeamData(teamId.toString());
         return {
             name: data.name || `Team ${teamId}`,
             logo: data.logo ? `https://kickbase.b-cdn.net/${data.logo}` : null
         };
     };
 
-    // TODO: Add handlers for changing matchday/season later if needed
+    const matchdays = Array.from({ length: 34 }, (_, i) => i + 1);
 
+    const isLoading = isLoadingMatchday || (selectedMatchday !== null && isLoadingMatches);
 
     return (
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
             <header className="bg-white dark:bg-gray-800 shadow">
                 <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                        Spieltag {selectedMatchday} ({selectedSeason})
-                    </h1>
+                    <div className="flex items-center space-x-3">
+                        {leagueId && leagueImage && (
+                            <button onClick={() => router.push(`/dashboard?league=${leagueId}`)} title="Zum Liga-Dashboard">
+                                <img 
+                                    src={leagueImage} 
+                                    alt="Liga Logo" 
+                                    className="h-10 w-10 rounded-md object-cover hover:opacity-80 transition-opacity"
+                                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                                />
+                            </button>
+                        )}
+                        <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
+                            Spieltag {selectedMatchday ?? '...'} ({selectedSeason})
+                        </h1>
+                    </div>
                     <button onClick={handleBack} className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
                         Zurück
                     </button>
@@ -100,20 +154,38 @@ export default function MatchesPage() {
             </header>
 
             <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
+                <div className="mb-6 px-4 sm:px-0">
+                    <div className={`flex flex-wrap justify-center gap-1 ${isLoadingMatchday ? 'opacity-50 pointer-events-none' : ''}`}>
+                        {matchdays.map((md) => (
+                            <button
+                                key={md}
+                                onClick={() => setSelectedMatchday(md)}
+                                disabled={isLoadingMatchday}
+                                className={`px-3 py-1 border text-xs font-medium rounded-md transition-colors duration-150 
+                                    ${selectedMatchday === md 
+                                        ? 'bg-indigo-600 text-white border-indigo-600 dark:bg-indigo-500 dark:border-indigo-500' 
+                                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600'}
+                                `}
+                            >
+                                {md}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 <div className="px-4 py-6 sm:px-0">
                     {isLoading ? (
                         <div className="text-center p-6 bg-white dark:bg-gray-800 rounded-lg shadow">
-                            <p className="text-gray-600 dark:text-gray-300">Lade Spiele...</p>
-                            {/* Optional: Add a spinner */}
+                            <p className="text-gray-600 dark:text-gray-300">Lade Daten...</p>
                         </div>
                     ) : error ? (
                         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative shadow dark:bg-red-900/30 dark:border-red-600 dark:text-red-300" role="alert">
                             <strong className="font-bold">Fehler!</strong>
                             <span className="block sm:inline"> {error}</span>
                         </div>
-                    ) : matches.length === 0 ? (
+                    ) : matches.length === 0 && !isLoadingMatches ? (
                          <div className="text-center p-6 bg-white dark:bg-gray-800 rounded-lg shadow">
-                            <p className="text-gray-600 dark:text-gray-300">Keine Spiele für diesen Spieltag gefunden.</p>
+                            <p className="text-gray-600 dark:text-gray-300">Keine Spiele für Spieltag {selectedMatchday} gefunden.</p>
                         </div>
                     ) : (
                         <div className="space-y-4">
@@ -122,43 +194,84 @@ export default function MatchesPage() {
                                 const awayTeam = getTeamDisplayData(match.away_club_id);
                                 const matchDate = new Date(match.match_date);
 
+                                // Calculate implied probabilities - START
+                                let probHome: number | null = null;
+                                let probDraw: number | null = null;
+                                let probAway: number | null = null;
+
+                                if (match.home_probabilities && match.draw_probabilities && match.away_probabilities) {
+                                    try {
+                                        const oddHome = parseFloat(match.home_probabilities);
+                                        const oddDraw = parseFloat(match.draw_probabilities);
+                                        const oddAway = parseFloat(match.away_probabilities);
+
+                                        if (!isNaN(oddHome) && !isNaN(oddDraw) && !isNaN(oddAway) && oddHome > 0 && oddDraw > 0 && oddAway > 0) {
+                                            const sumInvOdds = (1 / oddHome) + (1 / oddDraw) + (1 / oddAway);
+                                            if (sumInvOdds > 0) {
+                                                probHome = (1 / oddHome) / sumInvOdds;
+                                                probDraw = (1 / oddDraw) / sumInvOdds;
+                                                probAway = (1 / oddAway) / sumInvOdds;
+                                            }
+                                        }
+                                    } catch (e) {
+                                        console.error("Error calculating probabilities for match:", match.match_id, e);
+                                    }
+                                }
+                                // Calculate implied probabilities - END
+
                                 return (
                                     <div key={match.match_id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex flex-col items-center">
-                                        {/* Date and Time */}
                                         <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                                             {format(matchDate, 'EEEE, dd.MM.yyyy HH:mm')} Uhr
+                                             {format(matchDate, 'EEEE, dd.MM.yyyy')}
                                         </div>
 
-                                        {/* Teams and Score */}
-                                        <div className="flex items-center justify-around w-full mb-2">
-                                            {/* Home Team */}
-                                            <div className="flex flex-col items-center text-center w-1/3">
+                                        <div className="flex items-start justify-around w-full mb-2">
+                                            <button 
+                                                onClick={() => router.push(`/team-profile?teamId=${match.home_club_id}`)}
+                                                className="flex flex-col items-center text-center w-1/3 group hover:bg-gray-50 dark:hover:bg-gray-700/50 p-2 rounded-lg transition-colors"
+                                                title={`${homeTeam.name} Team Profil`}
+                                                disabled={!match.home_club_id}
+                                            >
                                                 {homeTeam.logo && <img src={homeTeam.logo} alt={homeTeam.name} className="h-12 w-12 object-contain mb-1"/>}
-                                                <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{homeTeam.name}</span>
-                                            </div>
+                                                <span className="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{homeTeam.name}</span>
+                                                {probHome !== null && (
+                                                    <span className="text-xs font-semibold text-green-600 dark:text-green-400 mt-1">
+                                                        ({(probHome * 100).toFixed(1)}%)
+                                                    </span>
+                                                )}
+                                            </button>
 
-                                            {/* Score */}
-                                            <div className="text-center px-4">
+                                            <div className="text-center px-4 mt-6">
                                                 <span className="text-2xl font-bold text-gray-900 dark:text-white">
                                                     {match.home_score ?? '-'} : {match.away_score ?? '-'}
                                                 </span>
+                                                {probDraw !== null && (
+                                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-1">
+                                                        ({(probDraw * 100).toFixed(1)}%)
+                                                    </div>
+                                                )}
+                                                {(match.home_probabilities || match.draw_probabilities || match.away_probabilities) && (
+                                                    <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 whitespace-nowrap">
+                                                         {match.home_probabilities ?? '-'} / {match.draw_probabilities ?? '-'} / {match.away_probabilities ?? '-'}
+                                                    </div>
+                                                )}
                                             </div>
 
-                                            {/* Away Team */}
-                                            <div className="flex flex-col items-center text-center w-1/3">
-                                                 {awayTeam.logo && <img src={awayTeam.logo} alt={awayTeam.name} className="h-12 w-12 object-contain mb-1"/>}
-                                                <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{awayTeam.name}</span>
-                                            </div>
+                                            <button 
+                                                onClick={() => router.push(`/team-profile?teamId=${match.away_club_id}`)}
+                                                className="flex flex-col items-center text-center w-1/3 group hover:bg-gray-50 dark:hover:bg-gray-700/50 p-2 rounded-lg transition-colors"
+                                                title={`${awayTeam.name} Team Profil`}
+                                                disabled={!match.away_club_id}
+                                            >
+                                                {awayTeam.logo && <img src={awayTeam.logo} alt={awayTeam.name} className="h-12 w-12 object-contain mb-1"/>}
+                                                <span className="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{awayTeam.name}</span>
+                                                {probAway !== null && (
+                                                    <span className="text-xs font-semibold text-red-600 dark:text-red-400 mt-1">
+                                                        ({(probAway * 100).toFixed(1)}%)
+                                                    </span>
+                                                )}
+                                            </button>
                                         </div>
-
-                                        {/* Probabilities */}
-                                        {(match.home_probabilities || match.draw_probabilities || match.away_probabilities) && (
-                                          <div className="flex justify-center space-x-4 text-xs text-gray-600 dark:text-gray-300 border-t border-gray-200 dark:border-gray-700 pt-2 w-full">
-                                            <span>1: {match.home_probabilities ? parseFloat(match.home_probabilities).toFixed(2) : '-'}</span>
-                                            <span>X: {match.draw_probabilities ? parseFloat(match.draw_probabilities).toFixed(2) : '-'}</span>
-                                            <span>2: {match.away_probabilities ? parseFloat(match.away_probabilities).toFixed(2) : '-'}</span>
-                                          </div>
-                                        )}
                                     </div>
                                 );
                             })}
