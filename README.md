@@ -1,3 +1,20 @@
+# kickbaseAnalyzer
+
+Ein Tool zur Vorhersage der Leistung von Bundesliga-Spielern mit historischen Daten und zur Bewertung relevanter Medien durch LLMs 
+
+![theate-readme](https://github.com/user-attachments/assets/b3171c52-7bae-4073-9cec-20945772a8fc)
+
+
+
+
+
+
+
+## Über das Projekt
+
+kickbaseAnalyzer verwendet historische Spielerdaten, um zukünftige Leistungen in der Bundesliga vorherzusagen. Zusätzlich werden Large Language Models (LLMs) eingesetzt, um relevante Medienberichte zu analysieren und in die Bewertung einfließen zu lassen.
+
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
