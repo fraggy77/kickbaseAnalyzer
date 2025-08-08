@@ -15,30 +15,29 @@ export default function LeaguesPage() {
 
   // Diese Funktion wird aufgerufen, wenn eine Liga ausgewählt wird ODER
   // wenn nur eine Liga vorhanden ist.
-  const handleLeagueSelect = async (leagueId: string, leagueName: string, leagueImage: string | undefined) => {
-    // Ladezustand nicht mehr ändern, da wir nicht mehr fetchen
-    // setIsLoading(true);
+  const handleLeagueSelect = async (
+    leagueId: string,
+    leagueName: string,
+    leagueImage: string | undefined
+  ) => {
     setError('');
 
     try {
-      // Hole Liga-Details NICHT MEHR hier
-      // const leagueDetails = await kickbaseAPI.getLeagueDetails(leagueId); // ENTFERNT
-
-      // Speichere die ausgewählte Liga-ID und den bereits bekannten Namen
-      localStorage.setItem('selectedLeague', JSON.stringify({
-        id: leagueId,
-        name: leagueName,
-        image: leagueImage
-      }));
+      // Auswahl lokal speichern
+      localStorage.setItem(
+        'selectedLeague',
+        JSON.stringify({
+          id: leagueId,
+          name: leagueName,
+          image: leagueImage,
+        })
+      );
 
       // Navigiere zum Dashboard
       router.push(`/dashboard?league=${leagueId}`);
-
     } catch (error: any) {
-      // Dieser Fehler sollte jetzt seltener auftreten, da wir keinen API-Call mehr machen
       console.error('Fehler beim Setzen der Liga-Auswahl:', error);
       setError('Fehler beim Verarbeiten der Liga-Auswahl.');
-      // setIsLoading(false); // Nicht mehr relevant
     }
   };
 
@@ -50,9 +49,9 @@ export default function LeaguesPage() {
         return false;
       }
       try {
-        const { token, id, email } = JSON.parse(storedUser); // ID auch auslesen
+        const { token, id, email } = JSON.parse(storedUser);
         kickbaseAPI.token = token;
-        kickbaseAPI.userId = id; // userId auch setzen
+        kickbaseAPI.userId = id;
         kickbaseAPI.email = email;
         return true;
       } catch (error) {
@@ -63,13 +62,29 @@ export default function LeaguesPage() {
       }
     };
 
+    // Auth prüfen
+    const ok = checkAuth();
+    if (!ok) return;
 
+    // Ligen aus SessionStorage laden (wenn zuvor abgelegt)
+    try {
+      const raw = sessionStorage.getItem('pendingLeagues');
+      if (raw) {
+        const parsed = JSON.parse(raw) as League[];
+        setLeagues(parsed);
+      }
+    } catch (e) {
+      console.error('Konnte pendingLeagues nicht lesen:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [router]);
 
   const handleLogout = () => {
     localStorage.removeItem('kickbaseUser');
     localStorage.removeItem('selectedLeague');
-    sessionStorage.removeItem('pendingLeagues'); // Auch hier entfernen
-    kickbaseAPI.token = null; // Token auch in der API-Instanz löschen
+    sessionStorage.removeItem('pendingLeagues');
+    kickbaseAPI.token = null;
     kickbaseAPI.userId = null;
     kickbaseAPI.email = null;
     router.push('/');
@@ -104,7 +119,11 @@ export default function LeaguesPage() {
                 <div className="flex">
                   <div className="flex-shrink-0">
                     <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                        clipRule="evenodd"
+                      />
                     </svg>
                   </div>
                   <div className="ml-3">
@@ -118,7 +137,11 @@ export default function LeaguesPage() {
               <div className="px-6 py-5 flex justify-center">
                 <svg className="animate-spin h-8 w-8 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
                 </svg>
                 <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Ligen werden geladen...</span>
               </div>
@@ -137,7 +160,6 @@ export default function LeaguesPage() {
                       <div className="min-w-0 flex-1 flex items-center">
                         <div className="flex-shrink-0 bg-green-100 dark:bg-green-900 rounded-full p-2">
                           {(() => {
-                            console.log('Bild-URL:', league.image);
                             return (
                               <img
                                 src={league.image || '/placeholder.png'}
@@ -145,7 +167,7 @@ export default function LeaguesPage() {
                                 className="h-6 w-6 rounded-full object-cover"
                                 onError={(e) => {
                                   console.error('Bild konnte nicht geladen werden für Liga:', league.name, league.image);
-                                  e.currentTarget.src = '/placeholder.png';
+                                  (e.currentTarget as HTMLImageElement).src = '/placeholder.png';
                                 }}
                               />
                             );
@@ -155,19 +177,22 @@ export default function LeaguesPage() {
                           <div className="text-sm font-medium text-gray-900 dark:text-white text-left">
                             {league.name}
                           </div>
-                         
                         </div>
                       </div>
                       <div>
                         <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                          <path
+                            fillRule="evenodd"
+                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                            clipRule="evenodd"
+                          />
                         </svg>
                       </div>
                     </button>
                   </li>
                 ))}
               </ul>
-            ) : null }
+            ) : null}
           </div>
         </div>
       </main>
