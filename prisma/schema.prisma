@@ -1,15 +1,18 @@
+// prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider  = "postgresql"
-  url       = env("DATABASE_URL")  // Supabase 6543
-  directUrl = env("DIRECT_URL")    // Supabase 5432 (für Migrationen)
+  url       = env("DATABASE_URL")   // für App (Pooler in Vercel)
+  directUrl = env("DIRECT_URL")     // für Migration (Direct 5432 in GitHub Actions)
 }
 
-
-// Benutzermodell
+// Minimalmodell, damit Prisma valide ist
 model User {
-  // Schema hier einfügen aus meinem prisma-schema Artifact
+  id        String   @id @default(uuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
 }
