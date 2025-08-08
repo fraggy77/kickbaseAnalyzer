@@ -23,6 +23,12 @@ jobs:
           DATABASE_URL: ${{ secrets.DIRECT_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
         run: npx prisma generate
+        
+- name: Print DB host (debug)
+  env:
+    DATABASE_URL: ${{ secrets.DIRECT_URL }}
+  run: |
+    echo "$DATABASE_URL" | sed -E 's#(//[^:]+:)[^@]+@#\1***@#'
 
       - name: Prisma migrate deploy
         env:
