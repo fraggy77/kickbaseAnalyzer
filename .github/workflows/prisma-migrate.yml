@@ -1,0 +1,21 @@
+name: Prisma Migrate
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: Run migrations against Supabase (DIRECT_URL)
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx prisma migrate deploy
