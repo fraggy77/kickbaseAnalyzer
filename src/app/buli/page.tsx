@@ -1,12 +1,8 @@
-"use client";
-
-import { Suspense, useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-
+'use client';
 
 import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { kickbaseAPI } from '@/lib/kickbase-api';
 import type { CompetitionTable, BundesligaTeam } from '@/types/buli.types';
 
@@ -18,26 +14,19 @@ function BuliContent() {
   useEffect(() => {
     const loadTable = async () => {
       try {
-        // Beispiel: competitionId aus Query lesen, sonst default
         const competitionId = searchParams.get('competitionId') || 'BL1';
         const data = await kickbaseAPI.getCompetitionTable(competitionId);
         setTable(data);
-      } catch (err: any) {
-        console.error('Fehler beim Laden der Tabelle:', err);
+      } catch (e) {
+        console.error('Fehler beim Laden der Tabelle:', e);
         setError('Tabelle konnte nicht geladen werden.');
       }
     };
-
     loadTable();
   }, [searchParams]);
 
-  if (error) {
-    return <div className="p-6 text-red-600">{error}</div>;
-  }
-
-  if (!table) {
-    return <div className="p-6">Lade Bundesliga-Tabelle…</div>;
-  }
+  if (error) return <div className="p-6 text-red-600">{error}</div>;
+  if (!table) return <div className="p-6">Lade Bundesliga-Tabelle…</div>;
 
   return (
     <div className="p-6">
@@ -51,9 +40,9 @@ function BuliContent() {
           </tr>
         </thead>
         <tbody>
-          {table.teams.map((team: BundesligaTeam, index: number) => (
+          {table.teams.map((team: BundesligaTeam, i) => (
             <tr key={team.id}>
-              <td className="border border-gray-300 px-2 py-1">{index + 1}</td>
+              <td className="border border-gray-300 px-2 py-1">{i + 1}</td>
               <td className="border border-gray-300 px-2 py-1">{team.name}</td>
               <td className="border border-gray-300 px-2 py-1 text-right">{team.points}</td>
             </tr>
